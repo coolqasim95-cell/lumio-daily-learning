@@ -1,0 +1,44 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "r44jJJPeCRZD7s5oNzBJc"
+uri = "file://artifacts/mobile/assets/images/icon.png"
+type = "image"
+title = "lumio app icon"
+
+[[generated]]
+id = "_E2s40ACKQf4oQThOaOXY"
+uri = "file://artifacts/mobile/assets/images/splash.png"
+type = "image"
+title = "lumio splash screen"
+
+[[generated]]
+id = "LjOWj2zgeeuFOQq_V6X_-"
+uri = "file://artifacts/mobile/assets/images/book_atomic.png"
+type = "image"
+title = "atomic habits book cover"
+
+[[generated]]
+id = "67kFW-PJW8Tu6xrXO5_hk"
+uri = "file://artifacts/mobile/assets/images/book_deep.png"
+type = "image"
+title = "deep work book cover"
+
+[[generated]]
+id = "WILRFXf2iRe27i1KZQLJe"
+uri = "file://artifacts/mobile/assets/images/book_think.png"
+type = "image"
+title = "think book cover"
+
+[[generated]]
+id = "xWCMsjeGiFWRPdn5FFcVN"
+uri = "file://artifacts/mobile/assets/images/book_now.png"
+type = "image"
+title = "power of now book cover"
+
+[[generated]]
+id = "Bl-Ih5n2TZQFkKnEE2IYH"
+uri = "file://artifacts/mobile/assets/images/book_why.png"
+type = "image"
+title = "start with why book cover"
