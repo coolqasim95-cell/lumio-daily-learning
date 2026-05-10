@@ -23,9 +23,10 @@ export default function QuizScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { bookId } = useLocalSearchParams<{ bookId: string }>();
-  const { xp } = useApp();
+  const { xp, customBooks } = useApp();
 
-  const book = BOOKS.find((b) => b.id === bookId);
+  const allBooks = [...BOOKS, ...customBooks];
+  const book = allBooks.find((b) => b.id === bookId);
   const [currentQ, setCurrentQ] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [answerState, setAnswerState] = useState<AnswerState>("idle");
@@ -49,7 +50,7 @@ export default function QuizScreen() {
           Book Complete!
         </Text>
         <Pressable
-          onPress={() => router.replace("/(tabs)/")}
+          onPress={() => router.replace("/")}
           style={[styles.doneBtn, { backgroundColor: colors.primary }]}
         >
           <Text style={styles.doneBtnText}>Back to Home</Text>
@@ -174,7 +175,7 @@ export default function QuizScreen() {
           </Text>
 
           <Pressable
-            onPress={() => router.replace("/(tabs)/")}
+            onPress={() => router.replace("/")}
             style={({ pressed }) => [
               styles.homeBtn,
               {
@@ -220,7 +221,7 @@ export default function QuizScreen() {
         ]}
       >
         <Pressable
-          onPress={() => router.replace("/(tabs)/")}
+          onPress={() => router.replace("/")}
           style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
           hitSlop={8}
         >

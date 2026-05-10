@@ -1,6 +1,9 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -11,40 +14,35 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { IdeaCard } from "@/components/IdeaCard";
+import { useApp } from "@/context/AppContext";
 import { BOOKS, CATEGORIES } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
 
 export default function ExploreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { completedBookIds, savedBookIds, toggleSaveBook, customBooks } = useApp();
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const allBooks = [...BOOKS, ...customBooks];
 
-  const filtered = BOOKS.filter((book) => {
-    const matchesCategory =
+  const filtered = allBooks.filter((book) => {
+    const matchCat =
       selectedCategory === "All" || book.category === selectedCategory;
-    const matchesQuery =
+    const matchQ =
       !query ||
       book.title.toLowerCase().includes(query.toLowerCase()) ||
-      book.author.toLowerCase().includes(query.toLowerCase()) ||
-      book.description.toLowerCase().includes(query.toLowerCase());
-    return matchesCategory && matchesQuery;
+      book.author.toLowerCase().includes(query.toLowerCase());
+    return matchCat && matchQ;
   });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: topPad + 12, backgroundColor: colors.background },
-        ]}
-      >
-        <Text style={[styles.title, { color: colors.foreground }]}>
-          Explore
-        </Text>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad + 12 }]}>
+        <Text style={[styles.title, { color: colors.foreground }]}>Explore</Text>
         <View
           style={[
             styles.searchBox,
@@ -55,7 +53,7 @@ export default function ExploreScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search books, authors..."
+            placeholder="Search books or authors..."
             placeholderTextColor={colors.mutedForeground}
             style={[styles.searchInput, { color: colors.foreground }]}
           />
@@ -71,59 +69,170 @@ export default function ExploreScreen() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categories}
+        contentContainerStyle={styles.catRow}
       >
         {CATEGORIES.map((cat) => (
           <Pressable
             key={cat}
             onPress={() => setSelectedCategory(cat)}
-            style={[
-              styles.catChip,
-              {
-                backgroundColor:
-                  selectedCategory === cat ? colors.navy : colors.secondary,
-                borderColor:
-                  selectedCategory === cat ? colors.navy : colors.border,
-              },
-            ]}
+            style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
           >
-            <Text
-              style={[
-                styles.catText,
-                {
-                  color:
-                    selectedCategory === cat ? "#fff" : colors.mutedForeground,
-                },
-              ]}
-            >
-              {cat}
-            </Text>
+            {selectedCategory === cat ? (
+              <LinearGradient
+                colors={["#F5A623", "#EF4444"]}
+                style={styles.catActive}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.catActiveText}>{cat}</Text>
+              </LinearGradient>
+            ) : (
+              <View
+                style={[
+                  styles.catInactive,
+                  { backgroundColor: colors.secondary, borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.catInactiveText, { color: colors.mutedForeground }]}>
+                  {cat}
+                </Text>
+              </View>
+            )}
           </Pressable>
         ))}
+        <Pressable
+          onPress={() => router.push("/add-book")}
+          style={[
+            styles.catInactive,
+            {
+              backgroundColor: "transparent",
+              borderColor: colors.primary,
+              borderStyle: "dashed",
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+            },
+          ]}
+        >
+          <Feather name="plus" size={13} color={colors.primary} />
+          <Text style={[styles.catInactiveText, { color: colors.primary }]}>
+            Add Book
+          </Text>
+        </Pressable>
       </ScrollView>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            paddingBottom:
-              Platform.OS === "web" ? 34 + 84 : insets.bottom + 84,
-          },
-        ]}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.bookList,
+          { paddingBottom: Platform.OS === "web" ? 90 : insets.bottom + 85 },
+        ]}
       >
         {filtered.length === 0 ? (
           <View style={styles.empty}>
             <Feather name="search" size={40} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-              No results found
+              No results
             </Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
               Try a different search or category
             </Text>
           </View>
         ) : (
-          filtered.map((book) => <IdeaCard key={book.id} book={book} />)
+          filtered.map((book) => {
+            const isCompleted = completedBookIds.includes(book.id);
+            const isSaved = savedBookIds.includes(book.id);
+
+            return (
+              <Pressable
+                key={book.id}
+                onPress={() => router.push(`/reader/${book.id}`)}
+                style={({ pressed }) => [
+                  styles.bookCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.88 : 1,
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[book.gradientFrom, book.gradientTo]}
+                  style={styles.bookCoverGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Image
+                    source={book.cover}
+                    style={styles.bookCoverImg}
+                  />
+                </LinearGradient>
+                <View style={styles.bookInfo}>
+                  <View style={styles.bookTop}>
+                    <View
+                      style={[
+                        styles.bookCat,
+                        { backgroundColor: colors.secondary },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.bookCatText, { color: colors.mutedForeground }]}
+                      >
+                        {book.category}
+                      </Text>
+                    </View>
+                    {isCompleted && (
+                      <View style={[styles.doneBadge, { backgroundColor: colors.success }]}>
+                        <Feather name="check" size={9} color="#fff" />
+                        <Text style={styles.doneBadgeText}>Done</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    style={[styles.bookTitle, { color: colors.foreground }]}
+                    numberOfLines={2}
+                  >
+                    {book.title}
+                  </Text>
+                  <Text
+                    style={[styles.bookAuthor, { color: colors.mutedForeground }]}
+                    numberOfLines={1}
+                  >
+                    {book.author}
+                  </Text>
+                  <Text
+                    style={[styles.bookDesc, { color: colors.mutedForeground }]}
+                    numberOfLines={2}
+                  >
+                    {book.description}
+                  </Text>
+                  <View style={styles.bookFooter}>
+                    <View style={styles.bookMeta}>
+                      <Feather name="zap" size={11} color={colors.primary} />
+                      <Text
+                        style={[styles.bookMetaText, { color: colors.mutedForeground }]}
+                      >
+                        {book.ideas.length} ideas · +{book.xpReward} XP
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        toggleSaveBook(book.id);
+                      }}
+                      hitSlop={8}
+                    >
+                      <Feather
+                        name="bookmark"
+                        size={17}
+                        color={isSaved ? colors.primary : colors.mutedForeground}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -137,11 +246,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5,
-  },
+  title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -151,41 +256,80 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    padding: 0,
-  },
-  categories: {
+  searchInput: { flex: 1, fontSize: 15, padding: 0 },
+  catRow: {
     paddingHorizontal: 20,
     paddingBottom: 12,
     gap: 8,
   },
-  catChip: {
+  catActive: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+  },
+  catActiveText: { fontSize: 13, fontWeight: "700", color: "#fff" },
+  catInactive: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
     borderWidth: 1,
   },
-  catText: {
-    fontSize: 13,
-    fontWeight: "600",
+  catInactiveText: { fontSize: 13, fontWeight: "600" },
+  bookList: { paddingHorizontal: 16, paddingTop: 4, gap: 10 },
+  bookCard: {
+    flexDirection: "row",
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+    alignItems: "center",
+    paddingRight: 14,
   },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
+  bookCoverGrad: { width: 76, height: 100, flexShrink: 0 },
+  bookCoverImg: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+    opacity: 0.85,
   },
+  bookInfo: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, gap: 3 },
+  bookTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  bookCat: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  bookCatText: {
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  doneBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  doneBadgeText: { fontSize: 9, fontWeight: "700", color: "#fff" },
+  bookTitle: { fontSize: 15, fontWeight: "800", lineHeight: 19 },
+  bookAuthor: { fontSize: 12, fontWeight: "400" },
+  bookDesc: { fontSize: 11, lineHeight: 15, marginTop: 1 },
+  bookFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  bookMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
+  bookMetaText: { fontSize: 11 },
   empty: {
     alignItems: "center",
     paddingTop: 60,
     gap: 10,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: "center",
-  },
+  emptyTitle: { fontSize: 18, fontWeight: "700" },
+  emptyText: { fontSize: 14, textAlign: "center" },
 });

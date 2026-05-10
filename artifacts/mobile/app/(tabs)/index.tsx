@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
@@ -12,11 +13,55 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { DailyProgress } from "@/components/DailyProgress";
-import { IdeaCard } from "@/components/IdeaCard";
 import { useApp } from "@/context/AppContext";
 import { BOOKS } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
+
+function BookGradientCard({
+  bookId,
+  compact = false,
+}: {
+  bookId: string;
+  compact?: boolean;
+}) {
+  const allBooks = useAllBooks();
+  const book = allBooks.find((b) => b.id === bookId);
+  const colors = useColors();
+  if (!book) return null;
+
+  if (compact) {
+    return (
+      <Pressable
+        onPress={() => router.push(`/reader/${book.id}`)}
+        style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+      >
+        <LinearGradient
+          colors={[book.gradientFrom, book.gradientTo]}
+          style={styles.compactCover}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Image source={book.cover} style={styles.compactCoverImg} />
+        </LinearGradient>
+        <Text
+          style={[styles.compactTitle, { color: colors.foreground }]}
+          numberOfLines={2}
+        >
+          {book.title}
+        </Text>
+        <Text style={[styles.compactAuthor, { color: colors.mutedForeground }]}>
+          {book.author}
+        </Text>
+      </Pressable>
+    );
+  }
+  return null;
+}
+
+function useAllBooks() {
+  const { customBooks } = useApp();
+  return [...BOOKS, ...customBooks];
+}
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -30,46 +75,43 @@ export default function HomeScreen() {
     inProgressBookId,
     inProgressIdeaIndex,
     completedBookIds,
+    customBooks,
   } = useApp();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
-
+  const allBooks = [...BOOKS, ...customBooks];
   const inProgressBook = inProgressBookId
-    ? BOOKS.find((b) => b.id === inProgressBookId)
+    ? allBooks.find((b) => b.id === inProgressBookId)
     : null;
-
-  const featuredBook = BOOKS[0];
-  const otherBooks = BOOKS.slice(1);
+  const featuredBooks = allBooks.slice(0, 6);
+  const dailyPick = allBooks[0];
+  const progress = Math.min(ideasReadToday / dailyGoal, 1);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Custom Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: topPad + 12, backgroundColor: colors.background },
-        ]}
-      >
-        <View style={styles.headerLeft}>
-          <View style={[styles.logoMark, { backgroundColor: colors.navy }]}>
-            <Feather name="zap" size={14} color={colors.primary} />
-          </View>
-          <Text style={[styles.logoText, { color: colors.foreground }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: topPad + 10 }]}>
+        <View>
+          <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
+            Good day 👋
+          </Text>
+          <Text style={[styles.appName, { color: colors.foreground }]}>
             lumio
           </Text>
         </View>
         <View style={styles.headerRight}>
-          <View style={[styles.levelBadge, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.levelText, { color: colors.foreground }]}>
-              Lv.{level}
-            </Text>
-          </View>
+          {streak > 0 && (
+            <View style={[styles.streakBadge, { backgroundColor: "#FFF3E0" }]}>
+              <Text style={styles.streakFire}>🔥</Text>
+              <Text style={styles.streakNum}>{streak}</Text>
+            </View>
+          )}
           <Pressable
             onPress={() => router.push("/(tabs)/progress")}
-            style={[styles.xpBadge, { backgroundColor: "#FFF3E0" }]}
+            style={[styles.xpBadge, { backgroundColor: colors.secondary }]}
           >
-            <Feather name="star" size={13} color={colors.primary} />
-            <Text style={[styles.xpText, { color: colors.primary }]}>
+            <Feather name="zap" size={13} color={colors.primary} />
+            <Text style={[styles.xpText, { color: colors.foreground }]}>
               {xp} XP
             </Text>
           </Pressable>
@@ -77,24 +119,50 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scroll,
-          {
-            paddingBottom:
-              Platform.OS === "web" ? 34 + 84 : insets.bottom + 84,
-          },
+          { paddingBottom: Platform.OS === "web" ? 90 : insets.bottom + 85 },
         ]}
-        showsVerticalScrollIndicator={false}
       >
-        {/* Daily Progress */}
-        <View style={styles.section}>
-          <DailyProgress
-            current={ideasReadToday}
-            goal={dailyGoal}
-            streak={streak}
-            xp={xp}
-          />
-        </View>
+        {/* Daily Goal Card */}
+        <LinearGradient
+          colors={[colors.navy, "#1E1E40"]}
+          style={styles.goalCard}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <View style={styles.goalTop}>
+            <View>
+              <Text style={styles.goalLabel}>Daily Goal</Text>
+              <Text style={styles.goalCount}>
+                <Text style={{ color: colors.primary, fontSize: 28 }}>
+                  {ideasReadToday}
+                </Text>
+                <Text style={{ fontSize: 18 }}>/{dailyGoal}</Text>{" "}
+                <Text style={{ fontSize: 14 }}>ideas</Text>
+              </Text>
+            </View>
+            <View style={styles.goalRight}>
+              <Text style={styles.levelBadge}>LV.{level}</Text>
+              {ideasReadToday >= dailyGoal && (
+                <Text style={styles.goalDone}>✓ Done!</Text>
+              )}
+            </View>
+          </View>
+          <View style={styles.goalTrack}>
+            <View
+              style={[
+                styles.goalFill,
+                {
+                  width: `${progress * 100}%` as any,
+                  backgroundColor:
+                    progress >= 1 ? colors.success : colors.primary,
+                },
+              ]}
+            />
+          </View>
+        </LinearGradient>
 
         {/* Continue Reading */}
         {inProgressBook && (
@@ -104,126 +172,154 @@ export default function HomeScreen() {
             </Text>
             <Pressable
               onPress={() => router.push(`/reader/${inProgressBook.id}`)}
-              style={({ pressed }) => [
-                styles.continueCard,
-                {
-                  backgroundColor: colors.navy,
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
+              style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
             >
-              <Image
-                source={inProgressBook.cover}
-                style={styles.continueCover}
-              />
-              <View style={styles.continueInfo}>
-                <Text style={styles.continueLabel}>In Progress</Text>
-                <Text style={styles.continueTitle}>{inProgressBook.title}</Text>
-                <Text style={styles.continueAuthor}>
-                  {inProgressBook.author}
-                </Text>
-                <View style={styles.continueProgress}>
-                  <View style={styles.continueTrack}>
-                    <View
-                      style={[
-                        styles.continueFill,
-                        {
-                          width: `${Math.round(
-                            ((inProgressIdeaIndex + 1) /
-                              inProgressBook.ideas.length) *
-                              100
-                          )}%` as any,
-                        },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.continuePercent}>
-                    {inProgressIdeaIndex + 1}/{inProgressBook.ideas.length}{" "}
-                    ideas
+              <LinearGradient
+                colors={[inProgressBook.gradientFrom, inProgressBook.gradientTo]}
+                style={styles.continueCard}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Image
+                  source={inProgressBook.cover}
+                  style={styles.continueCover}
+                />
+                <View style={styles.continueInfo}>
+                  <Text style={styles.continueCategory}>
+                    {inProgressBook.category}
                   </Text>
+                  <Text style={styles.continueTitle} numberOfLines={2}>
+                    {inProgressBook.title}
+                  </Text>
+                  <Text style={styles.continueAuthor}>
+                    {inProgressBook.author}
+                  </Text>
+                  <View style={styles.continueProgressRow}>
+                    <View style={styles.continueTrack}>
+                      <View
+                        style={[
+                          styles.continueFill,
+                          {
+                            width: `${Math.round(
+                              ((inProgressIdeaIndex + 1) /
+                                inProgressBook.ideas.length) *
+                                100
+                            )}%` as any,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.continuePercent}>
+                      {inProgressIdeaIndex + 1}/
+                      {inProgressBook.ideas.length}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              <Feather name="arrow-right" size={20} color="rgba(255,255,255,0.6)" />
+                <View style={styles.continueArrow}>
+                  <Feather name="arrow-right" size={18} color="rgba(255,255,255,0.8)" />
+                </View>
+              </LinearGradient>
             </Pressable>
           </View>
         )}
 
-        {/* Featured Book */}
+        {/* Today's Pick */}
         {!inProgressBook && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Featured Today
+              Today's Pick
             </Text>
             <Pressable
-              onPress={() => router.push(`/reader/${featuredBook.id}`)}
-              style={({ pressed }) => [
-                styles.featuredCard,
-                {
-                  backgroundColor: colors.navy,
-                  opacity: pressed ? 0.9 : 1,
-                },
-              ]}
+              onPress={() => router.push(`/reader/${dailyPick.id}`)}
+              style={({ pressed }) => [{ opacity: pressed ? 0.92 : 1 }]}
             >
-              <View style={styles.featuredContent}>
-                <View>
-                  <Text style={styles.featuredCategory}>
-                    {featuredBook.category}
-                  </Text>
-                  <Text style={styles.featuredTitle}>{featuredBook.title}</Text>
-                  <Text style={styles.featuredAuthor}>
-                    {featuredBook.author}
-                  </Text>
-                  <Text style={styles.featuredDesc}>
-                    {featuredBook.description}
-                  </Text>
-                </View>
-                <View style={styles.featuredMeta}>
-                  <View style={[styles.featuredBadge, { backgroundColor: colors.primary }]}>
-                    <Feather name="zap" size={13} color="#fff" />
-                    <Text style={styles.featuredBadgeText}>
-                      {featuredBook.ideas.length} ideas
-                    </Text>
+              <LinearGradient
+                colors={[dailyPick.gradientFrom, dailyPick.gradientTo]}
+                style={styles.featuredCard}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <View style={styles.featuredInfo}>
+                  <View
+                    style={[
+                      styles.catPill,
+                      { backgroundColor: "rgba(255,255,255,0.2)" },
+                    ]}
+                  >
+                    <Text style={styles.catPillText}>{dailyPick.category}</Text>
                   </View>
-                  <Text style={styles.featuredTime}>
-                    {featuredBook.readTime} min read
+                  <Text style={styles.featuredTitle}>{dailyPick.title}</Text>
+                  <Text style={styles.featuredAuthor}>{dailyPick.author}</Text>
+                  <Text style={styles.featuredDesc} numberOfLines={2}>
+                    {dailyPick.description}
                   </Text>
+                  <View style={styles.featuredMeta}>
+                    <View style={styles.metaItem}>
+                      <Feather name="zap" size={12} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.metaText}>
+                        {dailyPick.ideas.length} ideas
+                      </Text>
+                    </View>
+                    <View style={styles.metaItem}>
+                      <Feather name="star" size={12} color="rgba(255,255,255,0.7)" />
+                      <Text style={styles.metaText}>
+                        +{dailyPick.xpReward} XP
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-              <Image source={featuredBook.cover} style={styles.featuredCover} />
+                <Image source={dailyPick.cover} style={styles.featuredCover} />
+              </LinearGradient>
             </Pressable>
           </View>
         )}
 
-        {/* Horizontal quick picks */}
+        {/* Quick Picks */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Ideas for You
+              Your Library
             </Text>
             <Pressable onPress={() => router.push("/(tabs)/explore")}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>
-                See all
+                Browse all →
               </Text>
             </Pressable>
           </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontal}
+            contentContainerStyle={styles.quickRow}
           >
-            {BOOKS.map((book) => (
-              <Pressable
-                key={book.id}
-                onPress={() => router.push(`/reader/${book.id}`)}
-                style={({ pressed }) => [
-                  styles.quickCard,
-                  { backgroundColor: colors.card, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Image source={book.cover} style={styles.quickCover} />
-                <View style={styles.quickInfo}>
+            {allBooks.map((book) => {
+              const isCompleted = completedBookIds.includes(book.id);
+              return (
+                <Pressable
+                  key={book.id}
+                  onPress={() => router.push(`/reader/${book.id}`)}
+                  style={({ pressed }) => [
+                    styles.quickCard,
+                    { opacity: pressed ? 0.85 : 1 },
+                  ]}
+                >
+                  <LinearGradient
+                    colors={[book.gradientFrom, book.gradientTo]}
+                    style={styles.quickCoverGrad}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Image source={book.cover} style={styles.quickCoverImg} />
+                    {isCompleted && (
+                      <View style={styles.completedOverlay}>
+                        <Feather name="check" size={14} color="#fff" />
+                      </View>
+                    )}
+                  </LinearGradient>
                   <Text
-                    style={[styles.quickTitle, { color: colors.foreground }]}
+                    style={[
+                      styles.quickTitle,
+                      { color: colors.foreground },
+                    ]}
                     numberOfLines={2}
                   >
                     {book.title}
@@ -234,25 +330,139 @@ export default function HomeScreen() {
                   >
                     {book.author}
                   </Text>
-                  {completedBookIds.includes(book.id) && (
-                    <View style={[styles.completedDot, { backgroundColor: colors.success }]}>
-                      <Feather name="check" size={9} color="#fff" />
-                    </View>
-                  )}
-                </View>
-              </Pressable>
-            ))}
+                </Pressable>
+              );
+            })}
+            {/* Add book tile */}
+            <Pressable
+              onPress={() => router.push("/add-book")}
+              style={({ pressed }) => [
+                styles.quickCard,
+                { opacity: pressed ? 0.85 : 1 },
+              ]}
+            >
+              <View
+                style={[
+                  styles.quickCoverGrad,
+                  {
+                    backgroundColor: colors.secondary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    borderStyle: "dashed",
+                  },
+                ]}
+              >
+                <Feather name="plus" size={28} color={colors.mutedForeground} />
+              </View>
+              <Text
+                style={[styles.quickTitle, { color: colors.mutedForeground }]}
+              >
+                Add Book
+              </Text>
+            </Pressable>
           </ScrollView>
         </View>
 
-        {/* All books list */}
+        {/* Recent books list */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            Your Library
+            Recently Added
           </Text>
-          {otherBooks.map((book) => (
-            <IdeaCard key={book.id} book={book} />
-          ))}
+          {allBooks.slice(0, 4).map((book) => {
+            const isCompleted = completedBookIds.includes(book.id);
+            return (
+              <Pressable
+                key={book.id}
+                onPress={() => router.push(`/reader/${book.id}`)}
+                style={({ pressed }) => [
+                  styles.listCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    opacity: pressed ? 0.88 : 1,
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[book.gradientFrom, book.gradientTo]}
+                  style={styles.listCoverGrad}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Image
+                    source={book.cover}
+                    style={styles.listCoverImg}
+                  />
+                </LinearGradient>
+                <View style={styles.listInfo}>
+                  <View style={styles.listTop}>
+                    <View
+                      style={[
+                        styles.listCat,
+                        { backgroundColor: colors.secondary },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.listCatText,
+                          { color: colors.mutedForeground },
+                        ]}
+                      >
+                        {book.category}
+                      </Text>
+                    </View>
+                    {isCompleted && (
+                      <View
+                        style={[
+                          styles.doneTag,
+                          { backgroundColor: colors.success },
+                        ]}
+                      >
+                        <Feather name="check" size={10} color="#fff" />
+                        <Text style={styles.doneTagText}>Done</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text
+                    style={[styles.listTitle, { color: colors.foreground }]}
+                    numberOfLines={1}
+                  >
+                    {book.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.listAuthor,
+                      { color: colors.mutedForeground },
+                    ]}
+                  >
+                    {book.author}
+                  </Text>
+                  <View style={styles.listMeta}>
+                    <Feather
+                      name="zap"
+                      size={11}
+                      color={colors.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.listMetaText,
+                        { color: colors.mutedForeground },
+                      ]}
+                    >
+                      {book.ideas.length} ideas · +{book.xpReward} XP
+                    </Text>
+                  </View>
+                </View>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={colors.mutedForeground}
+                />
+              </Pressable>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -260,65 +470,96 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
     paddingHorizontal: 20,
     paddingBottom: 14,
   },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  logoMark: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoText: {
-    fontSize: 20,
+  greeting: { fontSize: 13, fontWeight: "500" },
+  appName: {
+    fontSize: 26,
     fontWeight: "800",
-    letterSpacing: -0.5,
+    letterSpacing: -1,
+    marginTop: 1,
   },
   headerRight: {
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
   },
-  levelBadge: {
+  streakBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  levelText: {
-    fontSize: 12,
-    fontWeight: "700",
+  streakFire: { fontSize: 14 },
+  streakNum: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#F5A623",
   },
   xpBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  xpText: {
+  xpText: { fontSize: 12, fontWeight: "700" },
+  scroll: { paddingHorizontal: 20 },
+  goalCard: {
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 22,
+    gap: 12,
+  },
+  goalTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  goalLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.55)",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginBottom: 2,
+  },
+  goalCount: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  goalRight: { alignItems: "flex-end", gap: 4 },
+  levelBadge: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
+  },
+  goalDone: {
     fontSize: 12,
     fontWeight: "700",
+    color: "#22C55E",
   },
-  scroll: {
-    paddingHorizontal: 20,
+  goalTrack: {
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 3,
+    overflow: "hidden",
   },
-  section: {
-    marginBottom: 24,
+  goalFill: {
+    height: "100%",
+    borderRadius: 3,
   },
+  section: { marginBottom: 24 },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -326,127 +567,115 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginBottom: 12,
-    letterSpacing: -0.3,
-  },
-  seeAll: {
-    fontSize: 13,
-    fontWeight: "600",
+    fontSize: 19,
+    fontWeight: "800",
+    letterSpacing: -0.5,
     marginBottom: 12,
   },
+  seeAll: { fontSize: 13, fontWeight: "600" },
   continueCard: {
+    borderRadius: 18,
     flexDirection: "row",
-    borderRadius: 16,
     padding: 14,
     alignItems: "center",
     gap: 12,
   },
   continueCover: {
-    width: 60,
-    height: 80,
+    width: 56,
+    height: 75,
     borderRadius: 8,
     resizeMode: "cover",
   },
-  continueInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  continueLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#F5A623",
+  continueInfo: { flex: 1, gap: 3 },
+  continueCategory: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "rgba(255,255,255,0.6)",
     textTransform: "uppercase",
-    letterSpacing: 0.8,
+    letterSpacing: 1.2,
   },
   continueTitle: {
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "800",
     color: "#fff",
+    lineHeight: 20,
   },
   continueAuthor: {
-    fontSize: 12,
+    fontSize: 11,
     color: "rgba(255,255,255,0.6)",
   },
-  continueProgress: {
-    marginTop: 6,
-    gap: 4,
+  continueProgressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
   },
   continueTrack: {
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.15)",
+    flex: 1,
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 2,
     overflow: "hidden",
   },
   continueFill: {
     height: "100%",
-    backgroundColor: "#F5A623",
+    backgroundColor: "#fff",
     borderRadius: 2,
   },
   continuePercent: {
     fontSize: 10,
-    color: "rgba(255,255,255,0.5)",
+    color: "rgba(255,255,255,0.6)",
   },
+  continueArrow: { paddingLeft: 4 },
   featuredCard: {
-    flexDirection: "row",
     borderRadius: 20,
-    overflow: "hidden",
+    flexDirection: "row",
     padding: 20,
     gap: 16,
     alignItems: "flex-start",
   },
-  featuredContent: {
-    flex: 1,
-    gap: 12,
+  featuredInfo: { flex: 1, gap: 6 },
+  catPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 2,
   },
-  featuredCategory: {
+  catPillText: {
     fontSize: 10,
     fontWeight: "700",
-    color: "#F5A623",
+    color: "#fff",
     textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 4,
+    letterSpacing: 0.8,
   },
   featuredTitle: {
-    fontSize: 20,
-    fontWeight: "800",
+    fontSize: 22,
+    fontWeight: "900",
     color: "#fff",
     lineHeight: 26,
     letterSpacing: -0.5,
   },
   featuredAuthor: {
     fontSize: 13,
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 2,
+    color: "rgba(255,255,255,0.65)",
+    fontWeight: "500",
   },
   featuredDesc: {
-    fontSize: 13,
+    fontSize: 12,
     color: "rgba(255,255,255,0.55)",
-    lineHeight: 18,
-    marginTop: 6,
+    lineHeight: 17,
   },
-  featuredMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  featuredBadge: {
+  featuredMeta: { flexDirection: "row", gap: 12, marginTop: 4 },
+  metaItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
   },
-  featuredBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#fff",
-  },
-  featuredTime: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.5)",
+  metaText: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.65)",
+    fontWeight: "500",
   },
   featuredCover: {
     width: 90,
@@ -454,39 +683,112 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     resizeMode: "cover",
   },
-  horizontal: {
-    gap: 12,
-    paddingRight: 8,
-  },
-  quickCard: {
-    width: 120,
+  quickRow: { gap: 14, paddingRight: 4 },
+  quickCard: { width: 110 },
+  quickCoverGrad: {
+    width: 110,
+    height: 145,
     borderRadius: 12,
-    borderWidth: 1,
     overflow: "hidden",
+    marginBottom: 8,
+    position: "relative",
   },
-  quickCover: {
+  quickCoverImg: {
     width: "100%",
-    height: 80,
+    height: "100%",
     resizeMode: "cover",
+    opacity: 0.85,
   },
-  quickInfo: {
-    padding: 8,
-    gap: 2,
+  completedOverlay: {
+    position: "absolute",
+    bottom: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#22C55E",
+    alignItems: "center",
+    justifyContent: "center",
   },
   quickTitle: {
     fontSize: 12,
     fontWeight: "700",
-    lineHeight: 16,
+    lineHeight: 15,
+    marginBottom: 2,
   },
-  quickAuthor: {
-    fontSize: 10,
-  },
-  completedDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  quickAuthor: { fontSize: 10, fontWeight: "400" },
+  listCard: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+    marginBottom: 10,
     alignItems: "center",
-    justifyContent: "center",
-    marginTop: 4,
+    paddingRight: 12,
   },
+  listCoverGrad: {
+    width: 70,
+    height: 90,
+    flexShrink: 0,
+  },
+  listCoverImg: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+    opacity: 0.85,
+  },
+  listInfo: { flex: 1, paddingHorizontal: 12, paddingVertical: 10, gap: 3 },
+  listTop: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  listCat: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  listCatText: {
+    fontSize: 9,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  doneTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  doneTagText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  listTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  listAuthor: { fontSize: 11, fontWeight: "400" },
+  listMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  listMetaText: { fontSize: 11 },
+  compactCover: {
+    width: "100%",
+    height: 130,
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  compactCoverImg: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+    opacity: 0.85,
+  },
+  compactTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 15,
+    marginBottom: 2,
+  },
+  compactAuthor: { fontSize: 10 },
 });

@@ -3,19 +3,20 @@ import {
   Inter_500Medium,
   Inter_600SemiBold,
   Inter_700Bold,
+  Inter_800ExtraBold,
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
-import { ActivityIndicator, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider, useApp } from "@/context/AppContext";
+import { HabitProvider } from "@/context/HabitContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -29,7 +30,7 @@ function RootLayoutNav() {
       if (!hasOnboarded) {
         router.replace("/onboarding");
       } else {
-        router.replace("/(tabs)/");
+        router.replace("/");
       }
     }
   }, [isLoading, hasOnboarded]);
@@ -37,12 +38,10 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="onboarding"
-        options={{ headerShown: false, animation: "fade" }}
-      />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, animation: "fade" }} />
       <Stack.Screen name="reader" options={{ headerShown: false }} />
       <Stack.Screen name="quiz" options={{ headerShown: false }} />
+      <Stack.Screen name="add-book" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -53,6 +52,7 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Inter_800ExtraBold,
   });
 
   useEffect(() => {
@@ -70,7 +70,9 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <AppProvider>
-                <RootLayoutNav />
+                <HabitProvider>
+                  <RootLayoutNav />
+                </HabitProvider>
               </AppProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

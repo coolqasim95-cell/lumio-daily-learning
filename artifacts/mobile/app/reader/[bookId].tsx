@@ -1,11 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Animated,
   Dimensions,
   FlatList,
+  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -19,18 +21,22 @@ import { useApp } from "@/context/AppContext";
 import { BOOKS, Idea } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: W } = Dimensions.get("window");
 
 export default function ReaderScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { bookId } = useLocalSearchParams<{ bookId: string }>();
-  const { markIdeaRead, addXP, completeBook, setInProgress } = useApp();
+  const { markIdeaRead, addXP, completeBook, setInProgress, customBooks } = useApp();
 
-  const book = BOOKS.find((b) => b.id === bookId);
+  const allBooks = [...BOOKS, ...customBooks];
+  const book = allBooks.find((b) => b.id === bookId);
+
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
   const flatListRef = useRef<FlatList>(null);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const hintOpacity = useRef(new Animated.Value(1)).current;
+  const btnScale = useRef(new Animated.Value(1)).current;
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -38,20 +44,37 @@ export default function ReaderScreen() {
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setCurrentIndex(viewableItems[0].index);
-        setInProgress(bookId ?? "", viewableItems[0].index);
+        const idx = viewableItems[0].index;
+        setCurrentIndex(idx);
+        setInProgress(bookId ?? "", idx);
+        if (idx > 0 && showSwipeHint) {
+          setShowSwipeHint(false);
+          Animated.timing(hintOpacity, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+        }
       }
     },
-    [bookId, setInProgress]
+    [bookId, setInProgress, showSwipeHint, hintOpacity]
   );
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
 
+  function animateButton() {
+    Animated.sequence([
+      Animated.timing(btnScale, { toValue: 0.93, duration: 80, useNativeDriver: true }),
+      Animated.timing(btnScale, { toValue: 1, duration: 120, useNativeDriver: true }),
+    ]).start();
+  }
+
   async function handleNext() {
     if (!book) return;
+    animateButton();
     await markIdeaRead();
     await addXP(10);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     if (currentIndex < book.ideas.length - 1) {
       flatListRef.current?.scrollToIndex({
@@ -62,57 +85,47 @@ export default function ReaderScreen() {
       await completeBook(bookId ?? "");
       await addXP(book.xpReward);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace(`/quiz/${bookId}`);
-    }
-  }
-
-  function handlePrev() {
-    if (currentIndex > 0) {
-      flatListRef.current?.scrollToIndex({
-        index: currentIndex - 1,
-        animated: true,
-      });
-      Haptics.selectionAsync();
+      if (book.quizzes.length > 0) {
+        router.replace(`/quiz/${bookId}`);
+      } else {
+        router.replace("/");
+      }
     }
   }
 
   if (!book) {
     return (
-      <View
-        style={[
-          styles.container,
-          styles.centered,
-          { backgroundColor: colors.background },
-        ]}
-      >
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text style={{ color: colors.mutedForeground }}>Book not found</Text>
       </View>
     );
   }
 
   const progress = (currentIndex + 1) / book.ideas.length;
+  const isLast = currentIndex === book.ideas.length - 1;
 
   function renderIdea({ item, index }: { item: Idea; index: number }) {
     return (
-      <View style={[styles.ideaPage, { width: SCREEN_WIDTH }]}>
+      <View style={[styles.ideaPage, { width: W }]}>
         <View
           style={[
             styles.ideaCard,
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {/* Idea number */}
-          <View style={styles.ideaHeader}>
-            <View
-              style={[
-                styles.ideaNumBadge,
-                { backgroundColor: colors.secondary },
-              ]}
+          {/* Idea badge */}
+          <View style={styles.ideaBadgeRow}>
+            <LinearGradient
+              colors={[book!.gradientFrom, book!.gradientTo]}
+              style={styles.ideaBadge}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
             >
-              <Text style={[styles.ideaNum, { color: colors.mutedForeground }]}>
-                IDEA {index + 1}
-              </Text>
-            </View>
+              <Text style={styles.ideaBadgeText}>IDEA {index + 1}</Text>
+            </LinearGradient>
+            <Text style={[styles.ideaOf, { color: colors.mutedForeground }]}>
+              of {book!.ideas.length}
+            </Text>
           </View>
 
           {/* Title */}
@@ -126,13 +139,22 @@ export default function ReaderScreen() {
           </Text>
 
           {/* XP hint */}
-          <View
-            style={[styles.xpHint, { backgroundColor: "#FFF3E0" }]}
-          >
-            <Feather name="zap" size={13} color="#F5A623" />
-            <Text style={styles.xpHintText}>+10 XP for reading this idea</Text>
+          <View style={[styles.xpRow, { backgroundColor: colors.secondary }]}>
+            <Feather name="zap" size={13} color={colors.primary} />
+            <Text style={[styles.xpRowText, { color: colors.primary }]}>
+              +10 XP for reading this idea
+            </Text>
           </View>
         </View>
+
+        {/* Swipe hint */}
+        {index === 0 && (
+          <Animated.View style={[styles.swipeHint, { opacity: hintOpacity }]}>
+            <Text style={[styles.swipeHintText, { color: colors.mutedForeground }]}>
+              ← Swipe to navigate ideas →
+            </Text>
+          </Animated.View>
+        )}
       </View>
     );
   }
@@ -140,58 +162,47 @@ export default function ReaderScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: topPad + 8,
-            backgroundColor: colors.background,
-            borderBottomColor: colors.border,
-          },
-        ]}
+      <LinearGradient
+        colors={[book.gradientFrom + "DD", book.gradientTo + "99"]}
+        style={[styles.header, { paddingTop: topPad + 6 }]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
       >
         <Pressable
           onPress={() => router.back()}
-          style={[styles.backBtn, { backgroundColor: colors.secondary }]}
-          hitSlop={8}
+          style={styles.backBtn}
+          hitSlop={12}
         >
-          <Feather name="x" size={18} color={colors.foreground} />
+          <Feather name="chevron-down" size={22} color="#fff" />
         </Pressable>
 
         <View style={styles.headerCenter}>
-          <Text
-            style={[styles.headerTitle, { color: colors.foreground }]}
-            numberOfLines={1}
-          >
-            {book.title}
-          </Text>
-          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-            {currentIndex + 1} of {book.ideas.length} ideas
-          </Text>
+          <Image source={book.cover} style={styles.headerCover} />
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {book.title}
+            </Text>
+            <Text style={styles.headerAuthor}>{book.author}</Text>
+          </View>
         </View>
 
-        <View style={[styles.xpBadge, { backgroundColor: "#FFF3E0" }]}>
-          <Feather name="star" size={13} color="#F5A623" />
-          <Text style={[styles.xpBadgeText, { color: "#F5A623" }]}>
-            {book.xpReward} XP
-          </Text>
+        <View style={styles.headerXP}>
+          <Feather name="star" size={13} color="rgba(255,255,255,0.8)" />
+          <Text style={styles.headerXPText}>+{book.xpReward}</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Progress bar */}
       <View style={[styles.progressTrack, { backgroundColor: colors.secondary }]}>
-        <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              width: `${progress * 100}%` as any,
-              backgroundColor: colors.primary,
-            },
-          ]}
+        <LinearGradient
+          colors={[book.gradientFrom, book.gradientTo]}
+          style={[styles.progressFill, { width: `${progress * 100}%` as any }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
         />
       </View>
 
-      {/* Swipeable ideas */}
+      {/* Ideas FlatList */}
       <FlatList
         ref={flatListRef}
         data={book.ideas}
@@ -202,80 +213,70 @@ export default function ReaderScreen() {
         showsHorizontalScrollIndicator={false}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig.current}
-        scrollEnabled={true}
-        contentContainerStyle={styles.flatListContent}
         style={styles.flatList}
+        decelerationRate="fast"
+        snapToInterval={W}
+        snapToAlignment="start"
       />
 
-      {/* Navigation */}
+      {/* Footer */}
       <View
         style={[
           styles.footer,
           {
-            paddingBottom: bottomPad + 16,
+            paddingBottom: bottomPad + 12,
             backgroundColor: colors.background,
             borderTopColor: colors.border,
           },
         ]}
       >
-        {/* Dots indicator */}
+        {/* Dot indicators */}
         <View style={styles.dots}>
           {book.ideas.map((_, i) => (
-            <View
+            <Pressable
               key={i}
-              style={[
-                styles.dot,
-                {
-                  backgroundColor:
-                    i === currentIndex ? colors.primary : colors.border,
-                  width: i === currentIndex ? 20 : 6,
-                },
-              ]}
-            />
+              onPress={() =>
+                flatListRef.current?.scrollToIndex({ index: i, animated: true })
+              }
+            >
+              <View
+                style={[
+                  styles.dot,
+                  {
+                    width: i === currentIndex ? 18 : 6,
+                    backgroundColor:
+                      i === currentIndex ? book.gradientFrom : colors.border,
+                  },
+                ]}
+              />
+            </Pressable>
           ))}
         </View>
 
-        <View style={styles.navRow}>
-          <Pressable
-            onPress={handlePrev}
-            disabled={currentIndex === 0}
-            style={({ pressed }) => [
-              styles.prevBtn,
-              {
-                backgroundColor: colors.secondary,
-                opacity: currentIndex === 0 ? 0.3 : pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            <Feather name="chevron-left" size={22} color={colors.foreground} />
-          </Pressable>
-
-          <Pressable
-            onPress={handleNext}
-            style={({ pressed }) => [
-              styles.nextBtn,
-              {
-                backgroundColor: colors.primary,
-                opacity: pressed ? 0.85 : 1,
-              },
-            ]}
-          >
-            <Text style={styles.nextText}>
-              {currentIndex === book.ideas.length - 1
-                ? "Finish & Quiz"
-                : "Next Idea"}
-            </Text>
-            <Feather
-              name={
-                currentIndex === book.ideas.length - 1
-                  ? "check-circle"
-                  : "chevron-right"
+        {/* Next button */}
+        <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+          <Pressable onPress={handleNext}>
+            <LinearGradient
+              colors={
+                isLast
+                  ? [colors.success, "#16A34A"]
+                  : [book.gradientFrom, book.gradientTo]
               }
-              size={18}
-              color="#fff"
-            />
+              style={styles.nextBtn}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.nextBtnText}>
+                {isLast ? "🎉 Finish & Quiz" : "Next Idea"}
+              </Text>
+              <Feather
+                name={isLast ? "check-circle" : "arrow-right"}
+                size={19}
+                color="#fff"
+              />
+            </LinearGradient>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </View>
   );
@@ -283,96 +284,103 @@ export default function ReaderScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  centered: { alignItems: "center", justifyContent: "center" },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 14,
     gap: 10,
-    borderBottomWidth: 1,
   },
   backBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
   headerCenter: {
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    gap: 2,
+    gap: 10,
   },
+  headerCover: {
+    width: 32,
+    height: 42,
+    borderRadius: 5,
+    resizeMode: "cover",
+  },
+  headerInfo: { flex: 1 },
   headerTitle: {
     fontSize: 14,
     fontWeight: "700",
+    color: "#fff",
   },
-  headerSub: {
+  headerAuthor: {
     fontSize: 11,
-    fontWeight: "500",
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 1,
   },
-  xpBadge: {
+  headerXP: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    backgroundColor: "rgba(255,255,255,0.15)",
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  xpBadgeText: {
+  headerXPText: {
     fontSize: 12,
     fontWeight: "700",
+    color: "#fff",
   },
-  progressTrack: {
-    height: 4,
-  },
-  progressFill: {
-    height: "100%",
-  },
-  flatList: {
-    flex: 1,
-  },
-  flatListContent: {
-    alignItems: "flex-start",
-  },
+  progressTrack: { height: 4 },
+  progressFill: { height: "100%", borderRadius: 2 },
+  flatList: { flex: 1 },
   ideaPage: {
     flex: 1,
-    padding: 20,
+    padding: 18,
     justifyContent: "center",
   },
   ideaCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
     padding: 24,
     gap: 16,
   },
-  ideaHeader: {
+  ideaBadgeRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
   },
-  ideaNumBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+  ideaBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 20,
   },
-  ideaNum: {
+  ideaBadgeText: {
     fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-  ideaTitle: {
-    fontSize: 24,
     fontWeight: "800",
-    lineHeight: 30,
-    letterSpacing: -0.5,
+    color: "#fff",
+    letterSpacing: 1.2,
+  },
+  ideaOf: { fontSize: 12, fontWeight: "500" },
+  ideaTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    lineHeight: 32,
+    letterSpacing: -0.7,
   },
   ideaContent: {
     fontSize: 16,
     lineHeight: 26,
     fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
+    letterSpacing: 0.1,
   },
-  xpHint: {
+  xpRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -381,16 +389,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignSelf: "flex-start",
   },
-  xpHintText: {
+  xpRowText: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#F5A623",
+    fontWeight: "700",
+  },
+  swipeHint: {
+    alignItems: "center",
+    marginTop: 16,
+  },
+  swipeHintText: {
+    fontSize: 12,
+    fontWeight: "500",
   },
   footer: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    gap: 14,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
   dots: {
     flexDirection: "row",
@@ -398,34 +413,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
   },
-  dot: {
-    height: 6,
-    borderRadius: 3,
-  },
-  navRow: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  prevBtn: {
-    width: 48,
-    height: 52,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  dot: { height: 6, borderRadius: 3 },
   nextBtn: {
-    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    height: 52,
-    borderRadius: 14,
+    gap: 10,
+    paddingVertical: 17,
+    borderRadius: 18,
   },
-  nextText: {
-    fontSize: 16,
-    fontWeight: "700",
+  nextBtnText: {
+    fontSize: 17,
+    fontWeight: "800",
     color: "#fff",
+    letterSpacing: -0.3,
   },
 });

@@ -1,43 +1,16 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
-import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
 
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="explore">
-        <Icon sf={{ default: "safari", selected: "safari.fill" }} />
-        <Label>Explore</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="saved">
-        <Icon sf={{ default: "bookmark", selected: "bookmark.fill" }} />
-        <Label>Saved</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="progress">
-        <Icon sf={{ default: "chart.bar", selected: "chart.bar.fill" }} />
-        <Label>Progress</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
-
-function ClassicTabLayout() {
+export default function TabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
-  const isWeb = Platform.OS === "web";
 
   return (
     <Tabs
@@ -47,89 +20,75 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: 1,
+          backgroundColor: isIOS ? "transparent" : colors.card,
+          borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          height: Platform.OS === "web" ? 70 : 70,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: "600",
-          marginTop: 2,
+          marginTop: -2,
+          letterSpacing: 0.2,
         },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
+              intensity={90}
+              tint={isDark ? "dark" : "extraLight"}
               style={StyleSheet.absoluteFill}
             />
-          ) : isWeb ? (
+          ) : (
             <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
-              ]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]}
             />
-          ) : null,
+          ),
+        tabBarItemStyle: {
+          paddingVertical: 6,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
-            ) : (
-              <Feather name="home" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color, focused }) => (
+            <Feather name={focused ? "home" : "home"} size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
           title: "Explore",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="safari" tintColor={color} size={24} />
-            ) : (
-              <Feather name="compass" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => (
+            <Feather name="compass" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="saved"
+        name="habits"
         options={{
-          title: "Saved",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="bookmark" tintColor={color} size={24} />
-            ) : (
-              <Feather name="bookmark" size={22} color={color} />
-            ),
+          title: "Habits",
+          tabBarIcon: ({ color }) => (
+            <Feather name="check-circle" size={22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="progress"
         options={{
           title: "Progress",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="chart.bar" tintColor={color} size={24} />
-            ) : (
-              <Feather name="bar-chart-2" size={22} color={color} />
-            ),
+          tabBarIcon: ({ color }) => (
+            <Feather name="bar-chart-2" size={22} color={color} />
+          ),
         }}
+      />
+      <Tabs.Screen
+        name="saved"
+        options={{ href: null, headerShown: false }}
       />
     </Tabs>
   );
-}
-
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
-  return <ClassicTabLayout />;
 }

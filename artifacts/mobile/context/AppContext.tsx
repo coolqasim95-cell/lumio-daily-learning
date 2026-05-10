@@ -7,7 +7,9 @@ import React, {
   useState,
 } from "react";
 
-const STORAGE_KEY = "lumio_app_state_v1";
+import { Book } from "@/data/content";
+
+const STORAGE_KEY = "lumio_app_state_v2";
 
 interface AppState {
   hasOnboarded: boolean;
@@ -25,6 +27,7 @@ interface AppState {
   inProgressBookId: string | null;
   inProgressIdeaIndex: number;
   totalIdeasRead: number;
+  customBooks: Book[];
 }
 
 interface AppContextType extends AppState {
@@ -34,6 +37,8 @@ interface AppContextType extends AppState {
   completeBook: (bookId: string) => Promise<void>;
   toggleSaveBook: (bookId: string) => Promise<void>;
   setInProgress: (bookId: string, ideaIndex: number) => Promise<void>;
+  addCustomBook: (book: Book) => Promise<void>;
+  deleteCustomBook: (bookId: string) => Promise<void>;
   resetProgress: () => Promise<void>;
 }
 
@@ -53,6 +58,7 @@ const defaultState: AppState = {
   inProgressBookId: null,
   inProgressIdeaIndex: 0,
   totalIdeasRead: 0,
+  customBooks: [],
 };
 
 const AppContext = createContext<AppContextType>({
@@ -63,6 +69,8 @@ const AppContext = createContext<AppContextType>({
   completeBook: async () => {},
   toggleSaveBook: async () => {},
   setInProgress: async () => {},
+  addCustomBook: async () => {},
+  deleteCustomBook: async () => {},
   resetProgress: async () => {},
 });
 
@@ -94,6 +102,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setState({
           ...defaultState,
           ...saved,
+          customBooks: saved.customBooks ?? [],
           ideasReadToday,
           isLoading: false,
         });
@@ -107,7 +116,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   async function saveState(newState: AppState) {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+      const toSave = { ...newState };
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
     } catch {}
   }
 
@@ -176,8 +186,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const next = {
         ...prev,
         completedBookIds: [...prev.completedBookIds, bookId],
-        inProgressBookId: prev.inProgressBookId === bookId ? null : prev.inProgressBookId,
-        inProgressIdeaIndex: prev.inProgressBookId === bookId ? 0 : prev.inProgressIdeaIndex,
+        inProgressBookId:
+          prev.inProgressBookId === bookId ? null : prev.inProgressBookId,
+        inProgressIdeaIndex:
+          prev.inProgressBookId === bookId ? 0 : prev.inProgressIdeaIndex,
       };
       saveState(next);
       return next;
@@ -195,9 +207,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const setInProgress = useCallback(async (bookId: string, ideaIndex: number) => {
+  const setInProgress = useCallback(
+    async (bookId: string, ideaIndex: number) => {
+      setState((prev) => {
+        const next = {
+          ...prev,
+          inProgressBookId: bookId,
+          inProgressIdeaIndex: ideaIndex,
+        };
+        saveState(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  const addCustomBook = useCallback(async (book: Book) => {
     setState((prev) => {
-      const next = { ...prev, inProgressBookId: bookId, inProgressIdeaIndex: ideaIndex };
+      const next = { ...prev, customBooks: [...prev.customBooks, book] };
+      saveState(next);
+      return next;
+    });
+  }, []);
+
+  const deleteCustomBook = useCallback(async (bookId: string) => {
+    setState((prev) => {
+      const next = {
+        ...prev,
+        customBooks: prev.customBooks.filter((b) => b.id !== bookId),
+        completedBookIds: prev.completedBookIds.filter((id) => id !== bookId),
+        savedBookIds: prev.savedBookIds.filter((id) => id !== bookId),
+      };
       saveState(next);
       return next;
     });
@@ -219,6 +259,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         completeBook,
         toggleSaveBook,
         setInProgress,
+        addCustomBook,
+        deleteCustomBook,
         resetProgress,
       }}
     >

@@ -42,3 +42,63 @@ id = "Bl-Ih5n2TZQFkKnEE2IYH"
 uri = "file://artifacts/mobile/assets/images/book_why.png"
 type = "image"
 title = "start with why book cover"
+
+[[generated]]
+id = "5EvmQx-7YBF7ryUAnSPYO"
+uri = "file://artifacts/mobile/assets/images/book_mental.png"
+type = "image"
+title = "8 mental models cover"
+
+[[generated]]
+id = "pjdQPWXP43BFafSUVb83d"
+uri = "file://artifacts/mobile/assets/images/book_12rules.png"
+type = "image"
+title = "12 rules for life cover"
+
+[[generated]]
+id = "4mss8-JDhFevxhWnuwufL"
+uri = "file://artifacts/mobile/assets/images/book_48laws.png"
+type = "image"
+title = "48 laws of power cover"
+
+[[generated]]
+id = "2_3MLugeeIunhpSSH1lih"
+uri = "file://artifacts/mobile/assets/images/book_attached.png"
+type = "image"
+title = "attached book cover"
+
+[[generated]]
+id = "9jSJqXO82uSKdiwoEG1p4"
+uri = "file://artifacts/mobile/assets/images/book_iceman.png"
+type = "image"
+title = "becoming the iceman cover"
+
+[[generated]]
+id = "3UaUl4T4-R9w8lHx1RaG2"
+uri = "file://artifacts/mobile/assets/images/book_goggins.png"
+type = "image"
+title = "can't hurt me cover"
+
+[[generated]]
+id = "EvBFbwItxhjpOXFVtbsNm"
+uri = "file://artifacts/mobile/assets/images/book_cash.png"
+type = "image"
+title = "cashvertising cover"
+
+[[generated]]
+id = "VduuncV8CgqYGYdwkK_fy"
+uri = "file://artifacts/mobile/assets/images/book_dalio.png"
+type = "image"
+title = "changing world order cover"
+
+[[generated]]
+id = "76sM2EhC8Gex5gJxIRjsc"
+uri = "file://artifacts/mobile/assets/images/book_compound.png"
+type = "image"
+title = "compound effect cover"
+
+[[generated]]
+id = "TiFn_IWQJsXMo9McOaAE-"
+uri = "file://artifacts/mobile/assets/images/book_atomic2.png"
+type = "image"
+title = "atomic habits redesigned cover"
