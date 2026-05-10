@@ -1,3 +1,4 @@
+import { useAuth, useClerk, useUser } from "@clerk/expo";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -34,6 +35,9 @@ const BADGES = [
 export default function ProgressScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
   const {
     xp,
     level,
@@ -77,6 +81,46 @@ export default function ProgressScreen() {
           { paddingBottom: Platform.OS === "web" ? 90 : insets.bottom + 85 },
         ]}
       >
+        {/* Account / Auth Card */}
+        {isSignedIn ? (
+          <View style={[styles.authCard, { backgroundColor: "#0D1A0D", borderColor: "#1A3A1A" }]}>
+            <View style={styles.authCardRow}>
+              <View style={[styles.authAvatar, { backgroundColor: "#22C55E33" }]}>
+                <Feather name="user" size={18} color="#22C55E" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#22C55E", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Synced</Text>
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }} numberOfLines={1}>
+                  {user?.emailAddresses[0]?.emailAddress}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => signOut()}
+                style={styles.signOutBtn}
+              >
+                <Text style={{ color: "#666", fontSize: 12, fontWeight: "600" }}>Sign Out</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => router.push("/(auth)/sign-in" as any)}
+            style={[styles.authCard, { backgroundColor: "#1A1020", borderColor: "#3D1F6E" }]}
+          >
+            <View style={styles.authCardRow}>
+              <View style={[styles.authAvatar, { backgroundColor: "#7C5CFC33" }]}>
+                <Feather name="lock" size={18} color="#7C5CFC" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: "#7C5CFC", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Offline</Text>
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }}>Sign in to sync progress</Text>
+                <Text style={{ color: "#666", fontSize: 12, marginTop: 2 }}>Keep your data across all devices</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color="#7C5CFC" />
+            </View>
+          </Pressable>
+        )}
+
         {/* XP Level Card */}
         <LinearGradient
           colors={["#0D0D2E", "#1E1060"]}
@@ -427,4 +471,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   resetText: { fontSize: 13, fontWeight: "500" },
+  authCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
+  },
+  authCardRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  authAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  signOutBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: "#1A1A1A",
+  },
 });
