@@ -7,9 +7,9 @@ import React, {
   useState,
 } from "react";
 
-import { Book } from "@/data/content";
+import { Book, BOOKS, getTopicCount } from "@/data/content";
 
-const STORAGE_KEY = "lumio_app_state_v2";
+const STORAGE_KEY = "lumio_app_state_v3";
 
 interface AppState {
   hasOnboarded: boolean;
@@ -20,26 +20,34 @@ interface AppState {
   streak: number;
   lastReadDate: string | null;
   streakDays: string[];
-  ideasReadToday: number;
+  topicsReadToday: number;
   dailyGoal: number;
   completedBookIds: string[];
+  completedLessonIds: string[];
+  completedTopicIds: string[];
   savedBookIds: string[];
   inProgressBookId: string | null;
-  inProgressIdeaIndex: number;
-  totalIdeasRead: number;
+  inProgressLessonId: string | null;
+  inProgressTopicId: string | null;
+  totalTopicsRead: number;
   customBooks: Book[];
 }
 
 interface AppContextType extends AppState {
   completeOnboarding: (goals: string[]) => Promise<void>;
   addXP: (amount: number) => Promise<void>;
-  markIdeaRead: () => Promise<void>;
+  completeTopic: (bookId: string, lessonId: string, topicId: string) => Promise<void>;
   completeBook: (bookId: string) => Promise<void>;
   toggleSaveBook: (bookId: string) => Promise<void>;
-  setInProgress: (bookId: string, ideaIndex: number) => Promise<void>;
+  setInProgress: (bookId: string, lessonId: string, topicId: string) => Promise<void>;
   addCustomBook: (book: Book) => Promise<void>;
   deleteCustomBook: (bookId: string) => Promise<void>;
   resetProgress: () => Promise<void>;
+  // Legacy aliases
+  markIdeaRead: () => Promise<void>;
+  ideasReadToday: number;
+  totalIdeasRead: number;
+  inProgressIdeaIndex: number;
 }
 
 const defaultState: AppState = {
@@ -51,27 +59,34 @@ const defaultState: AppState = {
   streak: 0,
   lastReadDate: null,
   streakDays: [],
-  ideasReadToday: 0,
+  topicsReadToday: 0,
   dailyGoal: 5,
   completedBookIds: [],
+  completedLessonIds: [],
+  completedTopicIds: [],
   savedBookIds: [],
   inProgressBookId: null,
-  inProgressIdeaIndex: 0,
-  totalIdeasRead: 0,
+  inProgressLessonId: null,
+  inProgressTopicId: null,
+  totalTopicsRead: 0,
   customBooks: [],
 };
 
 const AppContext = createContext<AppContextType>({
   ...defaultState,
+  ideasReadToday: 0,
+  totalIdeasRead: 0,
+  inProgressIdeaIndex: 0,
   completeOnboarding: async () => {},
   addXP: async () => {},
-  markIdeaRead: async () => {},
+  completeTopic: async () => {},
   completeBook: async () => {},
   toggleSaveBook: async () => {},
   setInProgress: async () => {},
   addCustomBook: async () => {},
   deleteCustomBook: async () => {},
   resetProgress: async () => {},
+  markIdeaRead: async () => {},
 });
 
 function getLevelFromXP(xp: number): number {
@@ -95,15 +110,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (raw) {
         const saved = JSON.parse(raw) as Partial<AppState>;
         const today = getTodayString();
-        let ideasReadToday = saved.ideasReadToday ?? 0;
+        let topicsReadToday = saved.topicsReadToday ?? 0;
         if (saved.lastReadDate !== today) {
-          ideasReadToday = 0;
+          topicsReadToday = 0;
         }
         setState({
           ...defaultState,
           ...saved,
           customBooks: saved.customBooks ?? [],
-          ideasReadToday,
+          completedLessonIds: saved.completedLessonIds ?? [],
+          completedTopicIds: saved.completedTopicIds ?? [],
+          topicsReadToday,
           isLoading: false,
         });
       } else {
@@ -116,8 +133,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   async function saveState(newState: AppState) {
     try {
-      const toSave = { ...newState };
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
     } catch {}
   }
 
@@ -145,32 +161,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const markIdeaRead = useCallback(async () => {
     setState((prev) => {
       const today = getTodayString();
-      const newIdeasReadToday = prev.ideasReadToday + 1;
-      const newTotalIdeasRead = prev.totalIdeasRead + 1;
-
+      const newTopicsToday = prev.topicsReadToday + 1;
+      const newTotal = prev.totalTopicsRead + 1;
       let newStreak = prev.streak;
       let newStreakDays = [...prev.streakDays];
-
       if (prev.lastReadDate !== today) {
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-        if (prev.lastReadDate === yesterdayStr || prev.streak === 0) {
+        const yStr = yesterday.toISOString().split("T")[0];
+        if (prev.lastReadDate === yStr || prev.streak === 0) {
           newStreak = prev.streak + 1;
-        } else if (prev.lastReadDate !== today) {
+        } else {
           newStreak = 1;
         }
-
         if (!newStreakDays.includes(today)) {
           newStreakDays = [...newStreakDays, today].slice(-90);
         }
       }
-
       const next = {
         ...prev,
-        ideasReadToday: newIdeasReadToday,
-        totalIdeasRead: newTotalIdeasRead,
+        topicsReadToday: newTopicsToday,
+        totalTopicsRead: newTotal,
         lastReadDate: today,
         streak: newStreak,
         streakDays: newStreakDays,
@@ -180,16 +191,87 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const completeTopic = useCallback(
+    async (bookId: string, lessonId: string, topicId: string) => {
+      setState((prev) => {
+        if (prev.completedTopicIds.includes(topicId)) return prev;
+
+        const today = getTodayString();
+        const newTopicsToday = prev.topicsReadToday + 1;
+        const newTotal = prev.totalTopicsRead + 1;
+
+        let newStreak = prev.streak;
+        let newStreakDays = [...prev.streakDays];
+        if (prev.lastReadDate !== today) {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yStr = yesterday.toISOString().split("T")[0];
+          if (prev.lastReadDate === yStr || prev.streak === 0) {
+            newStreak = prev.streak + 1;
+          } else {
+            newStreak = 1;
+          }
+          if (!newStreakDays.includes(today)) {
+            newStreakDays = [...newStreakDays, today].slice(-90);
+          }
+        }
+
+        const newCompletedTopics = [...prev.completedTopicIds, topicId];
+
+        // Check if lesson is complete
+        const allBooks = [...BOOKS, ...prev.customBooks];
+        const book = allBooks.find((b) => b.id === bookId);
+        let newCompletedLessons = [...prev.completedLessonIds];
+        let newCompletedBooks = [...prev.completedBookIds];
+
+        if (book) {
+          const lesson = book.lessons.find((l) => l.id === lessonId);
+          if (lesson) {
+            const lessonTopicIds = lesson.topics.map((t) => t.id);
+            const allLessonTopicsDone = lessonTopicIds.every(
+              (tid) => newCompletedTopics.includes(tid)
+            );
+            if (allLessonTopicsDone && !newCompletedLessons.includes(lessonId)) {
+              newCompletedLessons = [...newCompletedLessons, lessonId];
+            }
+          }
+
+          // Check if all lessons complete = book complete
+          const allLessonsDone = book.lessons.every((l) =>
+            newCompletedLessons.includes(l.id)
+          );
+          if (allLessonsDone && !newCompletedBooks.includes(bookId)) {
+            newCompletedBooks = [...newCompletedBooks, bookId];
+          }
+        }
+
+        const newXP = prev.xp + 10;
+        const next = {
+          ...prev,
+          xp: newXP,
+          level: getLevelFromXP(newXP),
+          completedTopicIds: newCompletedTopics,
+          completedLessonIds: newCompletedLessons,
+          completedBookIds: newCompletedBooks,
+          topicsReadToday: newTopicsToday,
+          totalTopicsRead: newTotal,
+          lastReadDate: today,
+          streak: newStreak,
+          streakDays: newStreakDays,
+        };
+        saveState(next);
+        return next;
+      });
+    },
+    []
+  );
+
   const completeBook = useCallback(async (bookId: string) => {
     setState((prev) => {
       if (prev.completedBookIds.includes(bookId)) return prev;
       const next = {
         ...prev,
         completedBookIds: [...prev.completedBookIds, bookId],
-        inProgressBookId:
-          prev.inProgressBookId === bookId ? null : prev.inProgressBookId,
-        inProgressIdeaIndex:
-          prev.inProgressBookId === bookId ? 0 : prev.inProgressIdeaIndex,
       };
       saveState(next);
       return next;
@@ -208,12 +290,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setInProgress = useCallback(
-    async (bookId: string, ideaIndex: number) => {
+    async (bookId: string, lessonId: string, topicId: string) => {
       setState((prev) => {
         const next = {
           ...prev,
           inProgressBookId: bookId,
-          inProgressIdeaIndex: ideaIndex,
+          inProgressLessonId: lessonId,
+          inProgressTopicId: topicId,
         };
         saveState(next);
         return next;
@@ -249,19 +332,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  // Helper: count completed topics for a book
+  function getBookTopicProgress(bookId: string): number {
+    const allBooks = [...BOOKS, ...state.customBooks];
+    const book = allBooks.find((b) => b.id === bookId);
+    if (!book) return 0;
+    return book.lessons
+      .flatMap((l) => l.topics)
+      .filter((t) => state.completedTopicIds.includes(t.id)).length;
+  }
+
   return (
     <AppContext.Provider
       value={{
         ...state,
+        // Legacy aliases
+        ideasReadToday: state.topicsReadToday,
+        totalIdeasRead: state.totalTopicsRead,
+        inProgressIdeaIndex: 0,
         completeOnboarding,
         addXP,
-        markIdeaRead,
+        completeTopic,
         completeBook,
         toggleSaveBook,
         setInProgress,
         addCustomBook,
         deleteCustomBook,
         resetProgress,
+        markIdeaRead,
       }}
     >
       {children}

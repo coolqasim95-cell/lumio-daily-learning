@@ -97,12 +97,29 @@ export default function AddBookScreen() {
       gradientFrom: gradient.from,
       gradientTo: gradient.to,
       isCustom: true,
-      ideas: validIdeas.map((text, i) => ({
-        id: `custom_idea_${Date.now()}_${i}`,
-        title: `Idea ${i + 1}`,
-        content: text.trim(),
-      })),
-      quizzes: [],
+      lessons: [
+        {
+          id: `custom_lesson_${Date.now()}`,
+          title: "Key Ideas",
+          topics: validIdeas.map((text, i) => ({
+            id: `custom_topic_${Date.now()}_${i}`,
+            title: `Idea ${i + 1}`,
+            content: text.trim(),
+            wisdom: text.trim().split(".")[0] + ".",
+            quiz: {
+              id: `custom_quiz_${Date.now()}_${i}`,
+              question: `What is the main point of Idea ${i + 1}?`,
+              options: [
+                text.trim().slice(0, 60) + "...",
+                "A different concept entirely",
+                "The opposite of the main idea",
+                "An unrelated topic",
+              ],
+              correctIndex: 0,
+            },
+          })),
+        },
+      ],
     };
 
     await addCustomBook(newBook);

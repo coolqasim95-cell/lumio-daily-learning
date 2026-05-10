@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useApp } from "@/context/AppContext";
-import { BOOKS } from "@/data/content";
+import { BOOKS, getTopicCount } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
 
 function BookGradientCard({
@@ -73,8 +73,8 @@ export default function HomeScreen() {
     xp,
     level,
     inProgressBookId,
-    inProgressIdeaIndex,
     completedBookIds,
+    completedTopicIds,
     customBooks,
   } = useApp();
 
@@ -201,8 +201,10 @@ export default function HomeScreen() {
                           styles.continueFill,
                           {
                             width: `${Math.round(
-                              ((inProgressIdeaIndex + 1) /
-                                inProgressBook.ideas.length) *
+                              (inProgressBook.lessons
+                                .flatMap((l) => l.topics)
+                                .filter((t) => completedTopicIds.includes(t.id)).length /
+                                getTopicCount(inProgressBook)) *
                                 100
                             )}%` as any,
                           },
@@ -210,8 +212,10 @@ export default function HomeScreen() {
                       />
                     </View>
                     <Text style={styles.continuePercent}>
-                      {inProgressIdeaIndex + 1}/
-                      {inProgressBook.ideas.length}
+                      {inProgressBook.lessons
+                        .flatMap((l) => l.topics)
+                        .filter((t) => completedTopicIds.includes(t.id)).length}/
+                      {getTopicCount(inProgressBook)}
                     </Text>
                   </View>
                 </View>
@@ -255,9 +259,9 @@ export default function HomeScreen() {
                   </Text>
                   <View style={styles.featuredMeta}>
                     <View style={styles.metaItem}>
-                      <Feather name="zap" size={12} color="rgba(255,255,255,0.7)" />
+                      <Feather name="layers" size={12} color="rgba(255,255,255,0.7)" />
                       <Text style={styles.metaText}>
-                        {dailyPick.ideas.length} ideas
+                        {dailyPick.lessons.length} lessons
                       </Text>
                     </View>
                     <View style={styles.metaItem}>
@@ -441,7 +445,7 @@ export default function HomeScreen() {
                   </Text>
                   <View style={styles.listMeta}>
                     <Feather
-                      name="zap"
+                      name="layers"
                       size={11}
                       color={colors.primary}
                     />
@@ -451,7 +455,7 @@ export default function HomeScreen() {
                         { color: colors.mutedForeground },
                       ]}
                     >
-                      {book.ideas.length} ideas · +{book.xpReward} XP
+                      {book.lessons.length} lessons · +{book.xpReward} XP
                     </Text>
                   </View>
                 </View>

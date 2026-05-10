@@ -1,97 +1,41 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useRef, useState } from "react";
+import React from "react";
 import {
-  Animated,
-  Dimensions,
-  FlatList,
   Image,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
-  ViewToken,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useApp } from "@/context/AppContext";
-import { BOOKS, Idea } from "@/data/content";
+import { BOOKS, getTopicCount } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
 
-const { width: W } = Dimensions.get("window");
-
-export default function ReaderScreen() {
+export default function LessonsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { bookId } = useLocalSearchParams<{ bookId: string }>();
-  const { markIdeaRead, addXP, completeBook, setInProgress, customBooks } = useApp();
+  const {
+    completedTopicIds,
+    completedLessonIds,
+    completedBookIds,
+    savedBookIds,
+    toggleSaveBook,
+    setInProgress,
+    customBooks,
+  } = useApp();
 
   const allBooks = [...BOOKS, ...customBooks];
   const book = allBooks.find((b) => b.id === bookId);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showSwipeHint, setShowSwipeHint] = useState(true);
-  const flatListRef = useRef<FlatList>(null);
-  const hintOpacity = useRef(new Animated.Value(1)).current;
-  const btnScale = useRef(new Animated.Value(1)).current;
-
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
-
-  const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        const idx = viewableItems[0].index;
-        setCurrentIndex(idx);
-        setInProgress(bookId ?? "", idx);
-        if (idx > 0 && showSwipeHint) {
-          setShowSwipeHint(false);
-          Animated.timing(hintOpacity, {
-            toValue: 0,
-            duration: 400,
-            useNativeDriver: true,
-          }).start();
-        }
-      }
-    },
-    [bookId, setInProgress, showSwipeHint, hintOpacity]
-  );
-
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 });
-
-  function animateButton() {
-    Animated.sequence([
-      Animated.timing(btnScale, { toValue: 0.93, duration: 80, useNativeDriver: true }),
-      Animated.timing(btnScale, { toValue: 1, duration: 120, useNativeDriver: true }),
-    ]).start();
-  }
-
-  async function handleNext() {
-    if (!book) return;
-    animateButton();
-    await markIdeaRead();
-    await addXP(10);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    if (currentIndex < book.ideas.length - 1) {
-      flatListRef.current?.scrollToIndex({
-        index: currentIndex + 1,
-        animated: true,
-      });
-    } else {
-      await completeBook(bookId ?? "");
-      await addXP(book.xpReward);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      if (book.quizzes.length > 0) {
-        router.replace(`/quiz/${bookId}`);
-      } else {
-        router.replace("/");
-      }
-    }
-  }
 
   if (!book) {
     return (
@@ -101,183 +45,279 @@ export default function ReaderScreen() {
     );
   }
 
-  const progress = (currentIndex + 1) / book.ideas.length;
-  const isLast = currentIndex === book.ideas.length - 1;
+  const totalTopics = getTopicCount(book);
+  const completedCount = book.lessons
+    .flatMap((l) => l.topics)
+    .filter((t) => completedTopicIds.includes(t.id)).length;
+  const bookProgress = totalTopics > 0 ? completedCount / totalTopics : 0;
+  const isBookComplete = completedBookIds.includes(book.id);
+  const isSaved = savedBookIds.includes(book.id);
 
-  function renderIdea({ item, index }: { item: Idea; index: number }) {
-    return (
-      <View style={[styles.ideaPage, { width: W }]}>
-        <View
-          style={[
-            styles.ideaCard,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
-        >
-          {/* Idea badge */}
-          <View style={styles.ideaBadgeRow}>
-            <LinearGradient
-              colors={[book!.gradientFrom, book!.gradientTo]}
-              style={styles.ideaBadge}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.ideaBadgeText}>IDEA {index + 1}</Text>
-            </LinearGradient>
-            <Text style={[styles.ideaOf, { color: colors.mutedForeground }]}>
-              of {book!.ideas.length}
-            </Text>
-          </View>
-
-          {/* Title */}
-          <Text style={[styles.ideaTitle, { color: colors.foreground }]}>
-            {item.title}
-          </Text>
-
-          {/* Content */}
-          <Text style={[styles.ideaContent, { color: colors.foreground }]}>
-            {item.content}
-          </Text>
-
-          {/* XP hint */}
-          <View style={[styles.xpRow, { backgroundColor: colors.secondary }]}>
-            <Feather name="zap" size={13} color={colors.primary} />
-            <Text style={[styles.xpRowText, { color: colors.primary }]}>
-              +10 XP for reading this idea
-            </Text>
-          </View>
-        </View>
-
-        {/* Swipe hint */}
-        {index === 0 && (
-          <Animated.View style={[styles.swipeHint, { opacity: hintOpacity }]}>
-            <Text style={[styles.swipeHintText, { color: colors.mutedForeground }]}>
-              ← Swipe to navigate ideas →
-            </Text>
-          </Animated.View>
-        )}
-      </View>
+  function handleStartTopic(lessonId: string, topicId: string) {
+    setInProgress(book!.id, lessonId, topicId);
+    router.push(
+      `/topic?bookId=${book!.id}&lessonId=${lessonId}&topicId=${topicId}` as any
     );
   }
 
+  function getFirstUncompletedTopic(): { lessonId: string; topicId: string } | null {
+    for (const lesson of book!.lessons) {
+      for (const topic of lesson.topics) {
+        if (!completedTopicIds.includes(topic.id)) {
+          return { lessonId: lesson.id, topicId: topic.id };
+        }
+      }
+    }
+    return null;
+  }
+
+  const nextTopic = getFirstUncompletedTopic();
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
+      {/* Book header */}
       <LinearGradient
-        colors={[book.gradientFrom + "DD", book.gradientTo + "99"]}
-        style={[styles.header, { paddingTop: topPad + 6 }]}
+        colors={[book.gradientFrom, book.gradientTo]}
+        style={[styles.bookHeader, { paddingTop: topPad + 6 }]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+        end={{ x: 1, y: 1 }}
       >
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backBtn}
-          hitSlop={12}
-        >
-          <Feather name="chevron-down" size={22} color="#fff" />
-        </Pressable>
+        <View style={styles.bookHeaderTop}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+            <Feather name="chevron-left" size={22} color="#fff" />
+          </Pressable>
+          <Pressable
+            onPress={() => toggleSaveBook(book.id)}
+            style={styles.saveBtn}
+            hitSlop={12}
+          >
+            <Feather
+              name={isSaved ? "bookmark" : "bookmark"}
+              size={20}
+              color={isSaved ? "#F5A623" : "rgba(255,255,255,0.7)"}
+            />
+          </Pressable>
+        </View>
 
-        <View style={styles.headerCenter}>
-          <Image source={book.cover} style={styles.headerCover} />
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {book.title}
-            </Text>
-            <Text style={styles.headerAuthor}>{book.author}</Text>
+        <View style={styles.bookInfo}>
+          <Image source={book.cover} style={styles.cover} />
+          <View style={styles.bookText}>
+            <Text style={styles.bookCategory}>{book.category}</Text>
+            <Text style={styles.bookTitle}>{book.title}</Text>
+            <Text style={styles.bookAuthor}>{book.author}</Text>
+            <View style={styles.bookMeta}>
+              <View style={styles.metaChip}>
+                <Feather name="layers" size={11} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.metaChipText}>{book.lessons.length} lessons</Text>
+              </View>
+              <View style={styles.metaChip}>
+                <Feather name="zap" size={11} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.metaChipText}>+{book.xpReward} XP</Text>
+              </View>
+              <View style={styles.metaChip}>
+                <Feather name="clock" size={11} color="rgba(255,255,255,0.8)" />
+                <Text style={styles.metaChipText}>{book.readTime} min</Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        <View style={styles.headerXP}>
-          <Feather name="star" size={13} color="rgba(255,255,255,0.8)" />
-          <Text style={styles.headerXPText}>+{book.xpReward}</Text>
+        {/* Overall progress */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressLabelRow}>
+            <Text style={styles.progressLabel}>
+              {isBookComplete ? "✓ Complete!" : `${completedCount} / ${totalTopics} topics`}
+            </Text>
+            <Text style={styles.progressPct}>{Math.round(bookProgress * 100)}%</Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${bookProgress * 100}%` as any }]} />
+          </View>
         </View>
       </LinearGradient>
 
-      {/* Progress bar */}
-      <View style={[styles.progressTrack, { backgroundColor: colors.secondary }]}>
-        <LinearGradient
-          colors={[book.gradientFrom, book.gradientTo]}
-          style={[styles.progressFill, { width: `${progress * 100}%` as any }]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        />
-      </View>
+      {/* Continue / Start CTA */}
+      {!isBookComplete && nextTopic && (
+        <Pressable
+          onPress={() => handleStartTopic(nextTopic.lessonId, nextTopic.topicId)}
+          style={({ pressed }) => [{ opacity: pressed ? 0.9 : 1 }]}
+        >
+          <LinearGradient
+            colors={[book.gradientFrom, book.gradientTo]}
+            style={styles.ctaBar}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <Feather name="play" size={16} color="#fff" />
+            <Text style={styles.ctaText}>
+              {completedCount === 0 ? "Start Learning" : "Continue"}
+            </Text>
+            <Feather name="arrow-right" size={16} color="#fff" />
+          </LinearGradient>
+        </Pressable>
+      )}
 
-      {/* Ideas FlatList */}
-      <FlatList
-        ref={flatListRef}
-        data={book.ideas}
-        keyExtractor={(item) => item.id}
-        renderItem={renderIdea}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig.current}
-        style={styles.flatList}
-        decelerationRate="fast"
-        snapToInterval={W}
-        snapToAlignment="start"
-      />
-
-      {/* Footer */}
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: bottomPad + 12,
-            backgroundColor: colors.background,
-            borderTopColor: colors.border,
-          },
-        ]}
-      >
-        {/* Dot indicators */}
-        <View style={styles.dots}>
-          {book.ideas.map((_, i) => (
-            <Pressable
-              key={i}
-              onPress={() =>
-                flatListRef.current?.scrollToIndex({ index: i, animated: true })
-              }
-            >
-              <View
-                style={[
-                  styles.dot,
-                  {
-                    width: i === currentIndex ? 18 : 6,
-                    backgroundColor:
-                      i === currentIndex ? book.gradientFrom : colors.border,
-                  },
-                ]}
-              />
-            </Pressable>
-          ))}
+      {isBookComplete && (
+        <View style={[styles.completeBanner, { backgroundColor: colors.success + "22", borderColor: colors.success }]}>
+          <Feather name="award" size={18} color={colors.success} />
+          <Text style={[styles.completeBannerText, { color: colors.success }]}>
+            Book Complete — All lessons mastered!
+          </Text>
         </View>
+      )}
 
-        {/* Next button */}
-        <Animated.View style={{ transform: [{ scale: btnScale }] }}>
-          <Pressable onPress={handleNext}>
-            <LinearGradient
-              colors={
-                isLast
-                  ? [colors.success, "#16A34A"]
-                  : [book.gradientFrom, book.gradientTo]
-              }
-              style={styles.nextBtn}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+      {/* Lessons list */}
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad + 20 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Lessons</Text>
+
+        {book.lessons.map((lesson, li) => {
+          const lessonTopicsCompleted = lesson.topics.filter((t) =>
+            completedTopicIds.includes(t.id)
+          ).length;
+          const lessonComplete = completedLessonIds.includes(lesson.id);
+          const lessonProgress = lessonTopicsCompleted / lesson.topics.length;
+          const isLocked =
+            li > 0 &&
+            !completedLessonIds.includes(book.lessons[li - 1].id) &&
+            completedCount === 0;
+
+          return (
+            <View
+              key={lesson.id}
+              style={[
+                styles.lessonCard,
+                { backgroundColor: colors.card, borderColor: colors.border },
+                lessonComplete && { borderColor: colors.success + "66" },
+              ]}
             >
-              <Text style={styles.nextBtnText}>
-                {isLast ? "🎉 Finish & Quiz" : "Next Idea"}
-              </Text>
-              <Feather
-                name={isLast ? "check-circle" : "arrow-right"}
-                size={19}
-                color="#fff"
-              />
-            </LinearGradient>
-          </Pressable>
-        </Animated.View>
-      </View>
+              {/* Lesson header */}
+              <View style={styles.lessonHeader}>
+                <LinearGradient
+                  colors={
+                    lessonComplete
+                      ? [colors.success, "#16A34A"]
+                      : [book.gradientFrom, book.gradientTo]
+                  }
+                  style={styles.lessonNum}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  {lessonComplete ? (
+                    <Feather name="check" size={14} color="#fff" />
+                  ) : (
+                    <Text style={styles.lessonNumText}>{li + 1}</Text>
+                  )}
+                </LinearGradient>
+                <View style={styles.lessonTitleBlock}>
+                  <Text style={[styles.lessonTitle, { color: colors.foreground }]}>
+                    {lesson.title}
+                  </Text>
+                  <Text style={[styles.lessonMeta, { color: colors.mutedForeground }]}>
+                    {lesson.topics.length} topics · {lessonTopicsCompleted}/{lesson.topics.length} done
+                  </Text>
+                </View>
+                {lessonComplete && (
+                  <View style={[styles.completeChip, { backgroundColor: colors.success + "22" }]}>
+                    <Text style={[styles.completeChipText, { color: colors.success }]}>Done</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Lesson progress bar */}
+              <View style={[styles.lessonProgressTrack, { backgroundColor: colors.secondary }]}>
+                <LinearGradient
+                  colors={lessonComplete ? [colors.success, "#16A34A"] : [book.gradientFrom, book.gradientTo]}
+                  style={[styles.lessonProgressFill, { width: `${lessonProgress * 100}%` as any }]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                />
+              </View>
+
+              {/* Topics */}
+              <View style={styles.topics}>
+                {lesson.topics.map((topic, ti) => {
+                  const done = completedTopicIds.includes(topic.id);
+                  const isNext =
+                    !done &&
+                    lesson.topics.slice(0, ti).every((t) => completedTopicIds.includes(t.id));
+
+                  return (
+                    <Pressable
+                      key={topic.id}
+                      onPress={() => handleStartTopic(lesson.id, topic.id)}
+                      style={({ pressed }) => [
+                        styles.topicRow,
+                        {
+                          backgroundColor: done
+                            ? colors.success + "11"
+                            : isNext
+                            ? book.gradientFrom + "18"
+                            : colors.background,
+                          borderColor: done
+                            ? colors.success + "44"
+                            : isNext
+                            ? book.gradientFrom + "55"
+                            : colors.border,
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.topicIcon,
+                          {
+                            backgroundColor: done
+                              ? colors.success
+                              : isNext
+                              ? book.gradientFrom
+                              : colors.border,
+                          },
+                        ]}
+                      >
+                        {done ? (
+                          <Feather name="check" size={11} color="#fff" />
+                        ) : (
+                          <Text style={styles.topicNumText}>{ti + 1}</Text>
+                        )}
+                      </View>
+                      <View style={styles.topicInfo}>
+                        <Text
+                          style={[
+                            styles.topicTitle,
+                            {
+                              color: done
+                                ? colors.success
+                                : isNext
+                                ? colors.foreground
+                                : colors.mutedForeground,
+                              fontWeight: isNext ? "700" : "500",
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {topic.title}
+                        </Text>
+                        <Text style={[styles.topicSub, { color: colors.mutedForeground }]}>
+                          {done ? "Completed ✓" : isNext ? "Up next" : "Topic"}
+                          {" · +10 XP"}
+                        </Text>
+                      </View>
+                      <Feather
+                        name={done ? "check-circle" : "chevron-right"}
+                        size={16}
+                        color={done ? colors.success : colors.border}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -285,12 +325,15 @@ export default function ReaderScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
+  bookHeader: {
     paddingHorizontal: 16,
-    paddingBottom: 14,
-    gap: 10,
+    paddingBottom: 18,
+    gap: 14,
+  },
+  bookHeaderTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   backBtn: {
     width: 36,
@@ -300,132 +343,211 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  headerCenter: {
-    flex: 1,
-    flexDirection: "row",
+  saveBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "center",
   },
-  headerCover: {
-    width: 32,
-    height: 42,
-    borderRadius: 5,
+  bookInfo: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "flex-start",
+  },
+  cover: {
+    width: 64,
+    height: 90,
+    borderRadius: 8,
     resizeMode: "cover",
   },
-  headerInfo: { flex: 1 },
-  headerTitle: {
-    fontSize: 14,
+  bookText: { flex: 1, gap: 3 },
+  bookCategory: {
+    fontSize: 10,
     fontWeight: "700",
-    color: "#fff",
-  },
-  headerAuthor: {
-    fontSize: 11,
     color: "rgba(255,255,255,0.7)",
-    marginTop: 1,
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
-  headerXP: {
+  bookTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#fff",
+    letterSpacing: -0.5,
+    lineHeight: 25,
+  },
+  bookAuthor: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.75)",
+  },
+  bookMeta: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+    flexWrap: "wrap",
+  },
+  metaChip: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     backgroundColor: "rgba(255,255,255,0.15)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 20,
   },
-  headerXPText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  progressTrack: { height: 4 },
-  progressFill: { height: "100%", borderRadius: 2 },
-  flatList: { flex: 1 },
-  ideaPage: {
-    flex: 1,
-    padding: 18,
-    justifyContent: "center",
-  },
-  ideaCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 24,
-    gap: 16,
-  },
-  ideaBadgeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  ideaBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  ideaBadgeText: {
+  metaChipText: {
     fontSize: 10,
-    fontWeight: "800",
-    color: "#fff",
-    letterSpacing: 1.2,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.9)",
   },
-  ideaOf: { fontSize: 12, fontWeight: "500" },
-  ideaTitle: {
-    fontSize: 26,
-    fontWeight: "900",
-    lineHeight: 32,
-    letterSpacing: -0.7,
-  },
-  ideaContent: {
-    fontSize: 16,
-    lineHeight: 26,
-    fontFamily: Platform.OS === "ios" ? "Georgia" : "serif",
-    letterSpacing: 0.1,
-  },
-  xpRow: {
+  progressSection: { gap: 6 },
+  progressLabelRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignSelf: "flex-start",
+    justifyContent: "space-between",
   },
-  xpRowText: {
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
+  },
+  progressPct: {
     fontSize: 12,
     fontWeight: "700",
+    color: "#fff",
   },
-  swipeHint: {
-    alignItems: "center",
-    marginTop: 16,
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    overflow: "hidden",
   },
-  swipeHintText: {
-    fontSize: 12,
-    fontWeight: "500",
+  progressFill: {
+    height: "100%",
+    borderRadius: 3,
+    backgroundColor: "#fff",
   },
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 12,
-  },
-  dots: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 5,
-  },
-  dot: { height: 6, borderRadius: 3 },
-  nextBtn: {
+  ctaBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    paddingVertical: 17,
-    borderRadius: 18,
+    paddingVertical: 14,
+    marginHorizontal: 16,
+    marginTop: 14,
+    borderRadius: 16,
   },
-  nextBtnText: {
-    fontSize: 17,
+  ctaText: {
+    fontSize: 16,
     fontWeight: "800",
     color: "#fff",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
+  },
+  completeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  completeBannerText: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  scroll: { padding: 16, gap: 14 },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: -0.4,
+    marginBottom: 2,
+  },
+  lessonCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  lessonHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    paddingBottom: 10,
+  },
+  lessonNum: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lessonNumText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  lessonTitleBlock: { flex: 1 },
+  lessonTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: -0.2,
+  },
+  lessonMeta: {
+    fontSize: 11,
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  completeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  completeChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  lessonProgressTrack: {
+    height: 3,
+    marginHorizontal: 16,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  lessonProgressFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  topics: { gap: 1, padding: 10, paddingTop: 8 },
+  topicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
+  topicIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topicNumText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  topicInfo: { flex: 1 },
+  topicTitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  topicSub: {
+    fontSize: 11,
+    marginTop: 1,
   },
 });

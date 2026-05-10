@@ -143,7 +143,7 @@ export function IdeaCard({ book, compact = false }: IdeaCardProps) {
           <View style={styles.metaRow}>
             <Feather name="zap" size={12} color={colors.primary} />
             <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-              {book.ideas.length} ideas · {book.readTime} min
+              {book.lessons.length} lessons · {book.readTime} min
             </Text>
           </View>
           {isCompleted && (

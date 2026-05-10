@@ -212,7 +212,7 @@ export default function ExploreScreen() {
                       <Text
                         style={[styles.bookMetaText, { color: colors.mutedForeground }]}
                       >
-                        {book.ideas.length} ideas · +{book.xpReward} XP
+                        {book.lessons.length} lessons · +{book.xpReward} XP
                       </Text>
                     </View>
                     <Pressable
