@@ -18,8 +18,10 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { SyncBridge } from "@/components/SyncBridge";
 import { AppProvider, useApp } from "@/context/AppContext";
 import { HabitProvider } from "@/context/HabitContext";
+import { SyncProvider } from "@/context/SyncContext";
 import { scheduleDailyReminder } from "@/lib/notifications";
 
 SplashScreen.preventAutoHideAsync();
@@ -55,6 +57,25 @@ function RootLayoutNav() {
   );
 }
 
+function AppTree({ withClerk }: { withClerk: boolean }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <KeyboardProvider>
+          <AppProvider>
+            <HabitProvider>
+              <SyncProvider>
+                {withClerk && <SyncBridge />}
+                <RootLayoutNav />
+              </SyncProvider>
+            </HabitProvider>
+          </AppProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
+  );
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = Font.useFonts({
     Inter_400Regular,
@@ -74,20 +95,6 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
-  const inner = (
-    <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <KeyboardProvider>
-          <AppProvider>
-            <HabitProvider>
-              <RootLayoutNav />
-            </HabitProvider>
-          </AppProvider>
-        </KeyboardProvider>
-      </GestureHandlerRootView>
-    </QueryClientProvider>
-  );
-
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
@@ -97,10 +104,12 @@ export default function RootLayout() {
             tokenCache={tokenCache}
             proxyUrl={proxyUrl}
           >
-            <ClerkLoaded>{inner}</ClerkLoaded>
+            <ClerkLoaded>
+              <AppTree withClerk={true} />
+            </ClerkLoaded>
           </ClerkProvider>
         ) : (
-          inner
+          <AppTree withClerk={false} />
         )}
       </ErrorBoundary>
     </SafeAreaProvider>

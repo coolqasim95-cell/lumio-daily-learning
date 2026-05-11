@@ -15,10 +15,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const HAS_CLERK = !!process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-function SignUpInner() {
-  const { signUp } = useSignUp();
+export default function SignUpScreen() {
+  const { signUp, errors, fetchStatus } = useSignUp();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -26,50 +24,30 @@ function SignUpInner() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"form" | "verify">("form");
-  const [isBusy, setIsBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const su = signUp as any;
+  const isBusy = fetchStatus === "fetching";
+  const emailError = errors?.fields?.emailAddress?.message ?? null;
+  const passwordError = errors?.fields?.password?.message ?? null;
+  const codeError = errors?.fields?.code?.message ?? null;
 
   const handleSignUp = async () => {
-    if (!su) return;
-    setIsBusy(true);
-    setError(null);
-    try {
-      const { error: createErr } = await su.create({ emailAddress: email, password });
-      if (createErr) {
-        setError(createErr.message ?? "Sign up failed.");
-        return;
-      }
-      await su.prepareEmailAddressVerification?.({ strategy: "email_code" });
-      setStep("verify");
-    } catch (err: unknown) {
-      const clerkErr = err as { errors?: { message: string }[] };
-      setError(clerkErr?.errors?.[0]?.message ?? "Sign up failed. Please try again.");
-    } finally {
-      setIsBusy(false);
-    }
+    if (!signUp) return;
+    const { error } = await signUp.password({ emailAddress: email, password });
+    if (error) return;
+    await signUp.verifications.sendEmailCode();
+    setStep("verify");
   };
 
   const handleVerify = async () => {
-    if (!su) return;
-    setIsBusy(true);
-    setError(null);
-    try {
-      const { error: verifyErr } = await su.attemptEmailAddressVerification?.({ code }) ?? {};
-      if (verifyErr) {
-        setError(verifyErr.message ?? "Invalid code.");
-        return;
-      }
-      if (su.status === "complete") {
-        await su.finalize?.();
-        router.replace("/" as Href);
-      }
-    } catch (err: unknown) {
-      const clerkErr = err as { errors?: { message: string }[] };
-      setError(clerkErr?.errors?.[0]?.message ?? "Invalid code. Please try again.");
-    } finally {
-      setIsBusy(false);
+    if (!signUp) return;
+    await signUp.verifications.verifyEmailCode({ code });
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ decorateUrl }) => {
+          const url = decorateUrl("/");
+          router.replace(url as Href);
+        },
+      });
     }
   };
 
@@ -80,7 +58,7 @@ function SignUpInner() {
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.inner}>
           <Text style={styles.logo}>⚡ lumio</Text>
           <Text style={styles.title}>Verify email</Text>
-          <Text style={styles.subtitle}>We sent a code to {email}.</Text>
+          <Text style={styles.subtitle}>We sent a code to {email}. Check your inbox!</Text>
           <Text style={styles.label}>Verification code</Text>
           <TextInput
             style={styles.input}
@@ -91,7 +69,7 @@ function SignUpInner() {
             keyboardType="numeric"
             autoFocus
           />
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {codeError && <Text style={styles.errorText}>{codeError}</Text>}
           <Pressable
             style={({ pressed }) => [styles.btn, (!code || isBusy) && styles.btnDisabled, pressed && styles.btnPressed]}
             onPress={handleVerify}
@@ -128,6 +106,7 @@ function SignUpInner() {
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {emailError && <Text style={styles.errorText}>{emailError}</Text>}
           <Text style={styles.label}>Password</Text>
           <TextInput
             style={styles.input}
@@ -137,7 +116,7 @@ function SignUpInner() {
             onChangeText={setPassword}
             secureTextEntry
           />
-          {error && <Text style={styles.errorText}>{error}</Text>}
+          {passwordError && <Text style={styles.errorText}>{passwordError}</Text>}
           <Pressable
             style={({ pressed }) => [styles.btn, (!email || !password || isBusy) && styles.btnDisabled, pressed && styles.btnPressed]}
             onPress={handleSignUp}
@@ -157,27 +136,6 @@ function SignUpInner() {
       </KeyboardAvoidingView>
     </View>
   );
-}
-
-function NoClerkScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[styles.container, { paddingTop: insets.top + 20 }]}>
-      <LinearGradient colors={["#0D0D1A", "#080810"]} style={StyleSheet.absoluteFill} />
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backText}>← Back</Text>
-      </Pressable>
-      <Text style={styles.logo}>⚡ lumio</Text>
-      <Text style={styles.title}>Local mode</Text>
-      <Text style={styles.subtitle}>Your progress is saved on this device. Account sync coming soon.</Text>
-    </View>
-  );
-}
-
-export default function SignUpScreen() {
-  if (!HAS_CLERK) return <NoClerkScreen />;
-  return <SignUpInner />;
 }
 
 const styles = StyleSheet.create({

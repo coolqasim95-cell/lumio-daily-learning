@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { getAuth } from "@clerk/express";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, userProgressTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -39,50 +39,65 @@ router.put("/user/progress", requireAuth, async (req: any, res): Promise<void> =
   const clerkUserId: string = req.clerkUserId;
 
   const customBooks = JSON.stringify(body.customBooks ?? []);
-  const habits = JSON.stringify(body.habits ?? []);
+  const habitsProvided = Object.prototype.hasOwnProperty.call(body, "habits");
+  const habitsValue = JSON.stringify(body.habits ?? []);
 
-  const values = {
+  const insertValues = {
     clerkUserId,
     xp: body.xp ?? 0,
     level: body.level ?? 1,
     streak: body.streak ?? 0,
     lastReadDate: body.lastReadDate ?? null,
     streakDays: body.streakDays ?? [],
-    totalIdeasRead: body.totalIdeasRead ?? 0,
-    ideasReadToday: body.ideasReadToday ?? 0,
+    totalIdeasRead: body.totalIdeasRead ?? body.totalTopicsRead ?? 0,
+    ideasReadToday: body.ideasReadToday ?? body.topicsReadToday ?? 0,
+    totalTopicsRead: body.totalTopicsRead ?? body.totalIdeasRead ?? 0,
+    topicsReadToday: body.topicsReadToday ?? body.ideasReadToday ?? 0,
     dailyGoal: body.dailyGoal ?? 5,
     completedBookIds: body.completedBookIds ?? [],
+    completedLessonIds: body.completedLessonIds ?? [],
+    completedTopicIds: body.completedTopicIds ?? [],
     savedBookIds: body.savedBookIds ?? [],
     inProgressBookId: body.inProgressBookId ?? null,
+    inProgressLessonId: body.inProgressLessonId ?? null,
+    inProgressTopicId: body.inProgressTopicId ?? null,
     inProgressIdeaIndex: body.inProgressIdeaIndex ?? 0,
     goals: body.goals ?? [],
     hasOnboarded: body.hasOnboarded ?? false,
     customBooks,
-    habits,
+    habits: habitsValue,
   };
 
   const [row] = await db
     .insert(userProgressTable)
-    .values(values)
+    .values(insertValues)
     .onConflictDoUpdate({
       target: userProgressTable.clerkUserId,
       set: {
-        xp: values.xp,
-        level: values.level,
-        streak: values.streak,
-        lastReadDate: values.lastReadDate,
-        streakDays: values.streakDays,
-        totalIdeasRead: values.totalIdeasRead,
-        ideasReadToday: values.ideasReadToday,
-        dailyGoal: values.dailyGoal,
-        completedBookIds: values.completedBookIds,
-        savedBookIds: values.savedBookIds,
-        inProgressBookId: values.inProgressBookId,
-        inProgressIdeaIndex: values.inProgressIdeaIndex,
-        goals: values.goals,
-        hasOnboarded: values.hasOnboarded,
+        xp: insertValues.xp,
+        level: insertValues.level,
+        streak: insertValues.streak,
+        lastReadDate: insertValues.lastReadDate,
+        streakDays: insertValues.streakDays,
+        totalIdeasRead: insertValues.totalIdeasRead,
+        ideasReadToday: insertValues.ideasReadToday,
+        totalTopicsRead: insertValues.totalTopicsRead,
+        topicsReadToday: insertValues.topicsReadToday,
+        dailyGoal: insertValues.dailyGoal,
+        completedBookIds: insertValues.completedBookIds,
+        completedLessonIds: insertValues.completedLessonIds,
+        completedTopicIds: insertValues.completedTopicIds,
+        savedBookIds: insertValues.savedBookIds,
+        inProgressBookId: insertValues.inProgressBookId,
+        inProgressLessonId: insertValues.inProgressLessonId,
+        inProgressTopicId: insertValues.inProgressTopicId,
+        inProgressIdeaIndex: insertValues.inProgressIdeaIndex,
+        goals: insertValues.goals,
+        hasOnboarded: insertValues.hasOnboarded,
         customBooks,
-        habits,
+        habits: habitsProvided
+          ? habitsValue
+          : sql`${userProgressTable.habits}`,
         updatedAt: new Date(),
       },
     })

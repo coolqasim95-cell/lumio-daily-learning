@@ -4,6 +4,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
+  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StreakCalendar } from "@/components/StreakCalendar";
 import { useApp } from "@/context/AppContext";
 import { useHabits } from "@/context/HabitContext";
+import { useSync } from "@/context/SyncContext";
 import { BOOKS } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
 
@@ -37,19 +39,32 @@ function ClerkAuthCard() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
+  const { isSyncing } = useSync();
 
   if (isSignedIn) {
     return (
-      <View style={[styles.authCard, { backgroundColor: "#0D1A0D", borderColor: "#1A3A1A" }]}>
+      <View style={[styles.authCard, { backgroundColor: "#0D1A0D", borderColor: isSyncing ? "#3A3A0D" : "#1A3A1A" }]}>
         <View style={styles.authCardRow}>
-          <View style={[styles.authAvatar, { backgroundColor: "#22C55E33" }]}>
-            <Feather name="user" size={18} color="#22C55E" />
+          <View style={[styles.authAvatar, { backgroundColor: isSyncing ? "#F5A62333" : "#22C55E33" }]}>
+            {isSyncing
+              ? <ActivityIndicator size="small" color="#F5A623" />
+              : <Feather name="user" size={18} color="#22C55E" />
+            }
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: "#22C55E", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Synced</Text>
-            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }} numberOfLines={1}>
-              {user?.emailAddresses[0]?.emailAddress}
-            </Text>
+            {isSyncing ? (
+              <>
+                <Text style={{ color: "#F5A623", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Syncing</Text>
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }}>Syncing your progress…</Text>
+              </>
+            ) : (
+              <>
+                <Text style={{ color: "#22C55E", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Synced</Text>
+                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }} numberOfLines={1}>
+                  {user?.emailAddresses[0]?.emailAddress}
+                </Text>
+              </>
+            )}
           </View>
           <Pressable onPress={() => signOut()} style={styles.signOutBtn}>
             <Text style={{ color: "#666", fontSize: 12, fontWeight: "600" }}>Sign Out</Text>

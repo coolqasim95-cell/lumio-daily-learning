@@ -23,12 +23,19 @@ interface HabitState {
   isLoading: boolean;
 }
 
+export interface HabitSyncPayload {
+  habits: Habit[];
+  completedDates: Record<string, string[]>;
+}
+
 interface HabitContextType extends HabitState {
   addHabit: (habit: Omit<Habit, "id" | "createdAt">) => Promise<void>;
   deleteHabit: (habitId: string) => Promise<void>;
   toggleHabitDate: (habitId: string, dateStr: string) => Promise<void>;
   getHabitStreak: (habitId: string) => number;
   isCompletedToday: (habitId: string) => boolean;
+  importHabits: (remote: HabitSyncPayload) => void;
+  getSyncPayload: () => HabitSyncPayload;
 }
 
 const HabitContext = createContext<HabitContextType>({
@@ -40,6 +47,8 @@ const HabitContext = createContext<HabitContextType>({
   toggleHabitDate: async () => {},
   getHabitStreak: () => 0,
   isCompletedToday: () => false,
+  importHabits: () => {},
+  getSyncPayload: () => ({ habits: [], completedDates: {} }),
 });
 
 function todayStr() {
@@ -165,6 +174,39 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
     [state.completedDates]
   );
 
+  const importHabits = useCallback((remote: HabitSyncPayload) => {
+    setState((prev) => {
+      const remoteHabits = remote.habits ?? [];
+      const remoteCompleted = remote.completedDates ?? {};
+
+      const habitMap = new Map<string, Habit>();
+      for (const h of prev.habits) habitMap.set(h.id, h);
+      for (const h of remoteHabits) {
+        if (!habitMap.has(h.id)) habitMap.set(h.id, h);
+      }
+      const mergedHabits = Array.from(habitMap.values());
+
+      const mergedCompleted: Record<string, string[]> = { ...prev.completedDates };
+      for (const [habitId, dates] of Object.entries(remoteCompleted)) {
+        const localDates = mergedCompleted[habitId] ?? [];
+        const union = Array.from(new Set([...localDates, ...dates]));
+        mergedCompleted[habitId] = union;
+      }
+
+      const next = { habits: mergedHabits, completedDates: mergedCompleted };
+      save(next);
+      return { ...prev, ...next };
+    });
+  }, []);
+
+  const getSyncPayload = useCallback(
+    (): HabitSyncPayload => ({
+      habits: state.habits,
+      completedDates: state.completedDates,
+    }),
+    [state.habits, state.completedDates]
+  );
+
   return (
     <HabitContext.Provider
       value={{
@@ -174,6 +216,8 @@ export function HabitProvider({ children }: { children: React.ReactNode }) {
         toggleHabitDate,
         getHabitStreak,
         isCompletedToday,
+        importHabits,
+        getSyncPayload,
       }}
     >
       {children}

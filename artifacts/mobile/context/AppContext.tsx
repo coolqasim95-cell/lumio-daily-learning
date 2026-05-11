@@ -43,6 +43,7 @@ interface AppContextType extends AppState {
   addCustomBook: (book: Book) => Promise<void>;
   deleteCustomBook: (bookId: string) => Promise<void>;
   resetProgress: () => Promise<void>;
+  importProgress: (remote: Record<string, unknown>) => void;
   // Legacy aliases
   markIdeaRead: () => Promise<void>;
   ideasReadToday: number;
@@ -86,6 +87,7 @@ const AppContext = createContext<AppContextType>({
   addCustomBook: async () => {},
   deleteCustomBook: async () => {},
   resetProgress: async () => {},
+  importProgress: () => {},
   markIdeaRead: async () => {},
 });
 
@@ -144,6 +146,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }
+
+  const importProgress = useCallback((remote: Record<string, unknown>) => {
+    setState((prev) => {
+      const today = getTodayString();
+      const remoteXP = (remote.xp as number) ?? 0;
+      const merged: AppState = {
+        ...prev,
+        xp: Math.max(prev.xp, remoteXP),
+        level: getLevelFromXP(Math.max(prev.xp, remoteXP)),
+        streak: Math.max(prev.streak, (remote.streak as number) ?? 0),
+        lastReadDate: (remote.lastReadDate as string | null) ?? prev.lastReadDate,
+        streakDays: mergeArrays(prev.streakDays, (remote.streakDays as string[]) ?? []),
+        totalTopicsRead: Math.max(prev.totalTopicsRead, (remote.totalTopicsRead as number) ?? (remote.totalIdeasRead as number) ?? 0),
+        topicsReadToday: (() => {
+          const remoteToday = (remote.topicsReadToday as number) ?? (remote.ideasReadToday as number) ?? 0;
+          const remoteDate = remote.lastReadDate as string | null;
+          const localToday = prev.lastReadDate === today ? prev.topicsReadToday : 0;
+          const remoteCount = remoteDate === today ? remoteToday : 0;
+          return Math.max(localToday, remoteCount);
+        })(),
+        dailyGoal: (remote.dailyGoal as number) ?? prev.dailyGoal,
+        completedBookIds: mergeArrays(prev.completedBookIds, (remote.completedBookIds as string[]) ?? []),
+        completedLessonIds: mergeArrays(prev.completedLessonIds, (remote.completedLessonIds as string[]) ?? []),
+        completedTopicIds: mergeArrays(prev.completedTopicIds, (remote.completedTopicIds as string[]) ?? []),
+        savedBookIds: mergeArrays(prev.savedBookIds, (remote.savedBookIds as string[]) ?? []),
+        inProgressBookId: (remote.inProgressBookId as string | null) ?? prev.inProgressBookId,
+        inProgressLessonId: (remote.inProgressLessonId as string | null) ?? prev.inProgressLessonId,
+        inProgressTopicId: (remote.inProgressTopicId as string | null) ?? prev.inProgressTopicId,
+        goals: (remote.goals as string[])?.length ? (remote.goals as string[]) : prev.goals,
+        hasOnboarded: prev.hasOnboarded || ((remote.hasOnboarded as boolean) ?? false),
+        customBooks: mergeCustomBooks(prev.customBooks, (remote.customBooks as Book[]) ?? []),
+        isLoading: false,
+      };
+      saveState(merged);
+      return merged;
+    });
+  }, []);
 
   const completeOnboarding = useCallback(async (goals: string[]) => {
     updateState({ hasOnboarded: true, goals });
@@ -332,16 +371,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  // Helper: count completed topics for a book
-  function getBookTopicProgress(bookId: string): number {
-    const allBooks = [...BOOKS, ...state.customBooks];
-    const book = allBooks.find((b) => b.id === bookId);
-    if (!book) return 0;
-    return book.lessons
-      .flatMap((l) => l.topics)
-      .filter((t) => state.completedTopicIds.includes(t.id)).length;
-  }
-
   return (
     <AppContext.Provider
       value={{
@@ -359,12 +388,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addCustomBook,
         deleteCustomBook,
         resetProgress,
+        importProgress,
         markIdeaRead,
       }}
     >
       {children}
     </AppContext.Provider>
   );
+}
+
+function mergeArrays<T>(local: T[], remote: T[]): T[] {
+  const set = new Set([...local, ...remote]);
+  return Array.from(set);
+}
+
+function mergeCustomBooks(local: Book[], remote: Book[]): Book[] {
+  const map = new Map<string, Book>();
+  for (const b of remote) map.set(b.id, b);
+  for (const b of local) map.set(b.id, b);
+  return Array.from(map.values());
 }
 
 export function useApp() {
