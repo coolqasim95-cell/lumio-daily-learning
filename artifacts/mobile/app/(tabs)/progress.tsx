@@ -20,6 +20,7 @@ import { BOOKS } from "@/data/content";
 import { useColors } from "@/hooks/useColors";
 
 const XP_PER_LEVEL = 100;
+const HAS_CLERK = !!process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 const BADGES = [
   { id: "first", icon: "star", label: "First Idea", desc: "Read your first idea", xpRequired: 1 },
@@ -32,12 +33,72 @@ const BADGES = [
   { id: "consistent", icon: "calendar", label: "Consistent", desc: "5-day habit streak", habitStreakRequired: 5 },
 ];
 
-export default function ProgressScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
+function ClerkAuthCard() {
   const { isSignedIn } = useAuth();
   const { user } = useUser();
   const { signOut } = useClerk();
+
+  if (isSignedIn) {
+    return (
+      <View style={[styles.authCard, { backgroundColor: "#0D1A0D", borderColor: "#1A3A1A" }]}>
+        <View style={styles.authCardRow}>
+          <View style={[styles.authAvatar, { backgroundColor: "#22C55E33" }]}>
+            <Feather name="user" size={18} color="#22C55E" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: "#22C55E", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Synced</Text>
+            <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }} numberOfLines={1}>
+              {user?.emailAddresses[0]?.emailAddress}
+            </Text>
+          </View>
+          <Pressable onPress={() => signOut()} style={styles.signOutBtn}>
+            <Text style={{ color: "#666", fontSize: 12, fontWeight: "600" }}>Sign Out</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={() => router.push("/(auth)/sign-in" as any)}
+      style={[styles.authCard, { backgroundColor: "#1A1020", borderColor: "#3D1F6E" }]}
+    >
+      <View style={styles.authCardRow}>
+        <View style={[styles.authAvatar, { backgroundColor: "#7C5CFC33" }]}>
+          <Feather name="lock" size={18} color="#7C5CFC" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: "#7C5CFC", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Offline</Text>
+          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }}>Sign in to sync progress</Text>
+          <Text style={{ color: "#666", fontSize: 12, marginTop: 2 }}>Keep your data across all devices</Text>
+        </View>
+        <Feather name="chevron-right" size={18} color="#7C5CFC" />
+      </View>
+    </Pressable>
+  );
+}
+
+function OfflineCard() {
+  return (
+    <View style={[styles.authCard, { backgroundColor: "#1A1020", borderColor: "#3D1F6E" }]}>
+      <View style={styles.authCardRow}>
+        <View style={[styles.authAvatar, { backgroundColor: "#7C5CFC33" }]}>
+          <Feather name="smartphone" size={18} color="#7C5CFC" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: "#7C5CFC", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Local</Text>
+          <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }}>Progress saved on device</Text>
+          <Text style={{ color: "#666", fontSize: 12, marginTop: 2 }}>Your streaks and XP are stored locally</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+export default function ProgressScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
   const {
     xp,
     level,
@@ -81,45 +142,7 @@ export default function ProgressScreen() {
           { paddingBottom: Platform.OS === "web" ? 90 : insets.bottom + 85 },
         ]}
       >
-        {/* Account / Auth Card */}
-        {isSignedIn ? (
-          <View style={[styles.authCard, { backgroundColor: "#0D1A0D", borderColor: "#1A3A1A" }]}>
-            <View style={styles.authCardRow}>
-              <View style={[styles.authAvatar, { backgroundColor: "#22C55E33" }]}>
-                <Feather name="user" size={18} color="#22C55E" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#22C55E", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Synced</Text>
-                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }} numberOfLines={1}>
-                  {user?.emailAddresses[0]?.emailAddress}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => signOut()}
-                style={styles.signOutBtn}
-              >
-                <Text style={{ color: "#666", fontSize: 12, fontWeight: "600" }}>Sign Out</Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <Pressable
-            onPress={() => router.push("/(auth)/sign-in" as any)}
-            style={[styles.authCard, { backgroundColor: "#1A1020", borderColor: "#3D1F6E" }]}
-          >
-            <View style={styles.authCardRow}>
-              <View style={[styles.authAvatar, { backgroundColor: "#7C5CFC33" }]}>
-                <Feather name="lock" size={18} color="#7C5CFC" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: "#7C5CFC", fontSize: 11, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" }}>Offline</Text>
-                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "700", marginTop: 1 }}>Sign in to sync progress</Text>
-                <Text style={{ color: "#666", fontSize: 12, marginTop: 2 }}>Keep your data across all devices</Text>
-              </View>
-              <Feather name="chevron-right" size={18} color="#7C5CFC" />
-            </View>
-          </Pressable>
-        )}
+        {HAS_CLERK ? <ClerkAuthCard /> : <OfflineCard />}
 
         {/* XP Level Card */}
         <LinearGradient
@@ -146,9 +169,7 @@ export default function ProgressScreen() {
               colors={[colors.primary, "#EF4444"]}
               style={[
                 styles.xpFill,
-                {
-                  width: `${(levelProgress / XP_PER_LEVEL) * 100}%` as any,
-                },
+                { width: `${(levelProgress / XP_PER_LEVEL) * 100}%` as any },
               ]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -171,12 +192,8 @@ export default function ProgressScreen() {
               style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <Feather name={stat.icon as any} size={20} color={stat.color} />
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
-                {stat.value}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-                {stat.label}
-              </Text>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>{stat.value}</Text>
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
             </View>
           ))}
         </View>
@@ -188,13 +205,9 @@ export default function ProgressScreen() {
         {habits.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-                Habit Streaks
-              </Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Habit Streaks</Text>
               <Pressable onPress={() => router.push("/(tabs)/habits")}>
-                <Text style={[styles.seeAll, { color: colors.primary }]}>
-                  Manage →
-                </Text>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>Manage →</Text>
               </Pressable>
             </View>
             {habits.map((habit) => {
@@ -202,31 +215,15 @@ export default function ProgressScreen() {
               return (
                 <View
                   key={habit.id}
-                  style={[
-                    styles.habitRow,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                  ]}
+                  style={[styles.habitRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
-                  <View
-                    style={[
-                      styles.habitIcon,
-                      { backgroundColor: habit.color + "22" },
-                    ]}
-                  >
-                    <Feather
-                      name={habit.icon as any}
-                      size={16}
-                      color={habit.color}
-                    />
+                  <View style={[styles.habitIcon, { backgroundColor: habit.color + "22" }]}>
+                    <Feather name={habit.icon as any} size={16} color={habit.color} />
                   </View>
-                  <Text style={[styles.habitName, { color: colors.foreground }]}>
-                    {habit.name}
-                  </Text>
+                  <Text style={[styles.habitName, { color: colors.foreground }]}>{habit.name}</Text>
                   <View style={styles.habitStreak}>
                     <Text style={styles.habitStreakFire}>🔥</Text>
-                    <Text style={[styles.habitStreakNum, { color: habit.color }]}>
-                      {s}
-                    </Text>
+                    <Text style={[styles.habitStreakNum, { color: habit.color }]}>{s}</Text>
                   </View>
                 </View>
               );
@@ -265,33 +262,14 @@ export default function ProgressScreen() {
                       <Feather name={badge.icon as any} size={20} color="#fff" />
                     </LinearGradient>
                   ) : (
-                    <View
-                      style={[
-                        styles.badgeIconWrap,
-                        { backgroundColor: colors.muted },
-                      ]}
-                    >
-                      <Feather
-                        name={badge.icon as any}
-                        size={20}
-                        color={colors.mutedForeground}
-                      />
+                    <View style={[styles.badgeIconWrap, { backgroundColor: colors.muted }]}>
+                      <Feather name={badge.icon as any} size={20} color={colors.mutedForeground} />
                     </View>
                   )}
-                  <Text
-                    style={[
-                      styles.badgeLabel,
-                      {
-                        color: earned ? colors.foreground : colors.mutedForeground,
-                      },
-                    ]}
-                  >
+                  <Text style={[styles.badgeLabel, { color: earned ? colors.foreground : colors.mutedForeground }]}>
                     {badge.label}
                   </Text>
-                  <Text
-                    style={[styles.badgeDesc, { color: colors.mutedForeground }]}
-                    numberOfLines={2}
-                  >
+                  <Text style={[styles.badgeDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
                     {badge.desc}
                   </Text>
                 </View>
@@ -303,28 +281,19 @@ export default function ProgressScreen() {
         {/* Completed books */}
         {completedBookIds.length > 0 && (
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-              Completed Books
-            </Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Completed Books</Text>
             {allBooks
               .filter((b) => completedBookIds.includes(b.id))
               .map((book) => (
                 <View
                   key={book.id}
-                  style={[
-                    styles.doneRow,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                  ]}
+                  style={[styles.doneRow, { backgroundColor: colors.card, borderColor: colors.border }]}
                 >
-                  <View
-                    style={[styles.doneCheck, { backgroundColor: colors.success }]}
-                  >
+                  <View style={[styles.doneCheck, { backgroundColor: colors.success }]}>
                     <Feather name="check" size={14} color="#fff" />
                   </View>
                   <View style={styles.doneInfo}>
-                    <Text style={[styles.doneTitle, { color: colors.foreground }]}>
-                      {book.title}
-                    </Text>
+                    <Text style={[styles.doneTitle, { color: colors.foreground }]}>{book.title}</Text>
                     <Text style={[styles.doneSub, { color: colors.mutedForeground }]}>
                       {book.author} · +{book.xpReward} XP earned
                     </Text>
@@ -339,9 +308,7 @@ export default function ProgressScreen() {
           style={[styles.resetBtn, { borderColor: colors.border }]}
         >
           <Feather name="refresh-ccw" size={13} color={colors.mutedForeground} />
-          <Text style={[styles.resetText, { color: colors.mutedForeground }]}>
-            Reset all progress
-          </Text>
+          <Text style={[styles.resetText, { color: colors.mutedForeground }]}>Reset all progress</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -353,145 +320,43 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 14 },
   title: { fontSize: 28, fontWeight: "800", letterSpacing: -0.5 },
   scroll: { paddingHorizontal: 20, gap: 16 },
-  levelCard: {
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-  },
-  levelTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  levelCard: { borderRadius: 20, padding: 20, gap: 12 },
+  levelTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   levelLabel: { fontSize: 22, fontWeight: "900", color: "#fff", letterSpacing: -0.5 },
   levelSub: { fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 3 },
-  xpBig: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
+  xpBig: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
   xpBigText: { fontSize: 20, fontWeight: "800", color: "#fff" },
-  xpTrack: {
-    height: 10,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 5,
-    overflow: "hidden",
-  },
+  xpTrack: { height: 10, backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 5, overflow: "hidden" },
   xpFill: { height: "100%", borderRadius: 5 },
   xpHintText: { fontSize: 11, color: "rgba(255,255,255,0.4)", textAlign: "right" },
   statsRow: { flexDirection: "row", gap: 10 },
-  statCard: {
-    flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    alignItems: "center",
-    gap: 5,
-  },
+  statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 14, alignItems: "center", gap: 5 },
   statValue: { fontSize: 24, fontWeight: "900" },
   statLabel: { fontSize: 10, fontWeight: "600", textAlign: "center" },
   section: { gap: 10 },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { fontSize: 18, fontWeight: "800", letterSpacing: -0.3 },
   seeAll: { fontSize: 13, fontWeight: "600" },
-  habitRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  habitIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  habitRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, borderWidth: 1 },
+  habitIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   habitName: { flex: 1, fontSize: 14, fontWeight: "700" },
   habitStreak: { flexDirection: "row", alignItems: "center", gap: 3 },
   habitStreakFire: { fontSize: 14 },
   habitStreakNum: { fontSize: 16, fontWeight: "800" },
-  badgesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  badgeCard: {
-    width: "47%",
-    borderRadius: 14,
-    padding: 14,
-    alignItems: "center",
-    gap: 8,
-  },
-  badgeIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  badgesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  badgeCard: { width: "47%", borderRadius: 14, padding: 14, alignItems: "center", gap: 8 },
+  badgeIconWrap: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center" },
   badgeLabel: { fontSize: 12, fontWeight: "700", textAlign: "center" },
   badgeDesc: { fontSize: 10, textAlign: "center", lineHeight: 13 },
-  doneRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  doneCheck: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  doneRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
+  doneCheck: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   doneInfo: { flex: 1 },
   doneTitle: { fontSize: 14, fontWeight: "700" },
   doneSub: { fontSize: 11, marginTop: 2 },
-  resetBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: 4,
-    marginBottom: 8,
-  },
+  resetBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12, borderWidth: 1, marginTop: 4, marginBottom: 8 },
   resetText: { fontSize: 13, fontWeight: "500" },
-  authCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-  },
-  authCardRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  authAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  signOutBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#1A1A1A",
-  },
+  authCard: { borderRadius: 16, borderWidth: 1, padding: 14 },
+  authCardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  authAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  signOutBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: "#1A1A1A" },
 });

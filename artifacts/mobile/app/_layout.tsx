@@ -26,7 +26,7 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 function RootLayoutNav() {
@@ -74,28 +74,34 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return null;
 
+  const inner = (
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <KeyboardProvider>
+          <AppProvider>
+            <HabitProvider>
+              <RootLayoutNav />
+            </HabitProvider>
+          </AppProvider>
+        </KeyboardProvider>
+      </GestureHandlerRootView>
+    </QueryClientProvider>
+  );
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <ClerkProvider
-          publishableKey={publishableKey}
-          tokenCache={tokenCache}
-          proxyUrl={proxyUrl}
-        >
-          <ClerkLoaded>
-            <QueryClientProvider client={queryClient}>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <AppProvider>
-                    <HabitProvider>
-                      <RootLayoutNav />
-                    </HabitProvider>
-                  </AppProvider>
-                </KeyboardProvider>
-              </GestureHandlerRootView>
-            </QueryClientProvider>
-          </ClerkLoaded>
-        </ClerkProvider>
+        {publishableKey ? (
+          <ClerkProvider
+            publishableKey={publishableKey}
+            tokenCache={tokenCache}
+            proxyUrl={proxyUrl}
+          >
+            <ClerkLoaded>{inner}</ClerkLoaded>
+          </ClerkProvider>
+        ) : (
+          inner
+        )}
       </ErrorBoundary>
     </SafeAreaProvider>
   );
