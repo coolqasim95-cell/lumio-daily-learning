@@ -1,0 +1,22 @@
+Starting project at /app/artifacts/mobile
+React Compiler enabled
+Starting Metro Bundler
+The following packages should be updated for best compatibility with the installed expo version:
+  expo-notifications@55.0.22 - expected version: ~0.32.17
+Your project may not work correctly until you install the expected versions of the packages.
+Waiting on http://localhost:8081
+Logs for your project will appear below.
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 64.0% ( 76/249)
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 64.0% (236/416)
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 64.0% (520/734)
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 71.0% ( 895/1062)
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.8% (1304/1442)
+Web Bundled 20722ms node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js (1640 modules)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 99ms node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web Bundled 95ms node_modules/.pnpm/expo-router@6.0.23_@types+react-dom@19.1.11_@types+react@19.1.10__@types+react@19.1.10__7a075898e0b9b0c13e105f418fc4ca94/node_modules/expo-router/entry.js (1 module)
+ LOG  [web] Logs will appear in the browser console
